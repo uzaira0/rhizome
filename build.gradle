@@ -1,0 +1,352 @@
+plugins {
+    id 'maven-publish'
+    id 'signing'
+    id 'application'
+    id 'java'
+    id 'eclipse'
+    id 'idea'
+    id 'checkstyle'
+    id 'jacoco'
+    id 'com.github.spotbugs'
+    id 'org.jetbrains.kotlin.jvm'
+    id 'org.jetbrains.kotlin.plugin.spring'
+    id 'org.jetbrains.dokka'
+}
+
+// dependencyLocking, java 21 source/target, shared KotlinCompile options,
+// checkstyle (shared pinned release, local gradles/checkstyle.xml), jacoco toolVersion, and the
+// spotbugs reportLevel/toolVersion defaults come from gradles/chronicle.gradle.
+
+description = "Java Framework for building scalable RESTful web applications"
+group = "com.geekbeast"
+
+ext.projectName = "rhizome"
+ext.scmUrl = 'scm:git:https://github.com/uzaira0/rhizome.git'
+ext.connectionUrl = 'scm:git:https://github.com/uzaira0/rhizome.git'
+ext.developerConnectionUrl = 'scm:git:https://github.com/uzaira0/rhizome.git'
+
+if(!project.hasProperty('developmentMode')) {
+    ext.developmentMode = false
+}
+
+println projectName + " with developmentMode = " + project.developmentMode
+
+def localChronicleGradle = file("../gradles/chronicle.gradle")
+if (!localChronicleGradle.exists()) {
+    localChronicleGradle = file("../methodic/gradles/chronicle.gradle")
+}
+if (localChronicleGradle.exists()) {
+    apply from: localChronicleGradle
+} else {
+    throw new GradleException("Missing local Chronicle Gradle script: ../gradles/chronicle.gradle (or ../methodic/gradles/chronicle.gradle) — check out the methodic repo beside this one")
+}
+
+
+application {
+    mainClass = "com.geekbeast.rhizome.core.Rhizome"
+}
+
+// SpotBugs enforcement note:
+// We canNOT simply set ignoreFailures=false here. rhizome references two OPTIONAL
+// websocket classes (jakarta.websocket.Extension, org.eclipse.jetty.websocket.api.
+// Session$Listener) that are not on the SpotBugs analysis (aux) classpath, so SpotBugs
+// exits with code 3 = ERROR|MISSING_CLASS — NOT the BUGS_FOUND bit (4). The Gradle
+// plugin treats any non-zero exit as failure under ignoreFailures=false, so a naive
+// flip would fail the build on an analysis-completeness artifact, not on a real defect.
+// Instead we keep ignoreFailures=true (tolerate the missing-class exit) and ENFORCE on
+// actual findings: emit XML and fail the build if the report contains any <BugInstance>.
+// Verified: 0 high-confidence findings at reportLevel='high'.
+spotbugsMain {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    ignoreFailures = true
+}
+
+spotbugsTest {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    ignoreFailures = true
+}
+
+// Real gate: a high-confidence SpotBugs BugInstance fails the build, while the
+// missing-optional-class exit-3 is tolerated.
+tasks.matching { it.name in ['spotbugsMain', 'spotbugsTest'] }.configureEach { sbTask ->
+    sbTask.doLast {
+        def xml = sbTask.reports.getByName('xml').outputLocation.asFile.get()
+        if (xml.exists()) {
+            def count = (xml.text =~ /<BugInstance\b/).count
+            if (count > 0) {
+                throw new GradleException("${sbTask.name}: ${count} SpotBugs finding(s) at " +
+                        "reportLevel='high' — see ${sbTask.reports.getByName('html').outputLocation.asFile.get()}")
+            }
+        }
+    }
+}
+
+
+run {
+    if (System.getProperty("exec.args") != null) {
+        args System.getProperty("exec.args").split()
+    }
+}
+
+tasks.withType(Javadoc) {
+    enabled = false
+}
+
+dokkaHtml {
+    outputDirectory = layout.buildDirectory.dir("javadoc")
+}
+
+test {
+    ignoreFailures = false
+    // These integration tests each bootstrap a full Rhizome: a singleton Hazelcast
+    // instance ("test"), an embedded Jetty on a fixed port (8081), and a JVM-global
+    // SSL socket factory for GreenMail. Sharing one JVM across test classes caused
+    // HazelcastInstanceNotActiveException (one class's teardown deactivates the
+    // shared instance), port 8081 BindException, and GreenMail SSL-provider
+    // pollution ("bad greeting" on the SMTPS port). Fork a fresh JVM per class,
+    // run serially, so each class gets pristine global state.
+    forkEvery = 1
+    maxParallelForks = 1
+}
+
+dependencies {
+    spotbugsPlugins "com.h3xstream.findsecbugs:findsecbugs-plugin:${findsecbugs_version}"
+
+    compileOnly "net.jcip:jcip-annotations:${jcip_version}"
+    compileOnly "com.github.spotbugs:spotbugs-annotations:${spotbugs_annotations_version}"
+
+    testCompileOnly "net.jcip:jcip-annotations:${jcip_version}"
+    testCompileOnly "com.github.spotbugs:spotbugs-annotations:${spotbugs_annotations_version}"
+
+    /*
+     * Servlet API 4.0.1
+     * 100% Java Servlet Container and Servlet Configuration
+     */
+    api "jakarta.servlet:jakarta.servlet-api:${jakarta_servlet}"
+    implementation "jakarta.servlet.jsp:jakarta.servlet.jsp-api:${jakarta_servlet_jsp}"
+    implementation "jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:${jakarta_servlet_jsp_jstl}"
+
+    /*
+     * SL4J + LOG4J2
+     */
+    api group: "org.slf4j", name: "slf4j-api", version: "${slf4j_version}"
+
+    api group: 'org.apache.logging.log4j', name: 'log4j-slf4j2-impl', version: "${log4j_version}"
+    api group: 'org.apache.logging.log4j', name: 'log4j-api', version: "${log4j_version}"
+    api group: 'org.apache.logging.log4j', name: 'log4j-core', version: "${log4j_version}"
+    api group: 'org.apache.logging.log4j', name: 'log4j-web', version: "${log4j_version}"
+
+    /*
+     * CORE SPRING FRAMEWORK DEPENDENCIES
+     * Depending injection, asynchronous execution, task scheduling, aspect oriented proxies, and more.
+     */
+    api "org.springframework:spring-core:${project.spring_framework_version}"
+    api "org.springframework:spring-beans:${project.spring_framework_version}"
+    api "org.springframework:spring-context:${project.spring_framework_version}"
+    api "org.springframework:spring-aop:${project.spring_framework_version}"
+    api "org.springframework:spring-web:${project.spring_framework_version}"
+    api "org.springframework:spring-webmvc:${project.spring_framework_version}"
+    api "org.springframework:spring-test:${project.spring_framework_version}"
+    /*
+     * SPRING SECURITY DEPENDENCIES
+     * Solid and battle tested security AuthN/AuthZ framwork
+     */
+    api "org.springframework.security:spring-security-core:${project.spring_security_version}"
+    api "org.springframework.security:spring-security-web:${project.spring_security_version}"
+    // spring-security-ldap removed: never imported in source code
+    // api "org.springframework.security:spring-security-ldap:${project.spring_security_version}"
+    api "org.springframework.security:spring-security-config:${project.spring_security_version}"
+    api "org.springframework.security:spring-security-messaging:${project.spring_security_version}"
+
+    //JDBI
+    api "org.jdbi:jdbi3-core:${jdbi3_version}"
+    api "org.jdbi:jdbi3-sqlobject:${jdbi3_version}"
+    api "org.jdbi:jdbi3-postgres:${jdbi3_version}"
+
+    api "org.springframework.security:spring-security-oauth2-resource-server:${project.spring_security_version}"
+    api "org.springframework.security:spring-security-oauth2-jose:${project.spring_security_version}"
+
+    /*
+     * Metrics
+     * Awesome reporting-- defaults to Graphite
+     */
+    api "io.dropwizard.metrics:metrics-core:${dropwizard_metrics_version}"
+    api "io.dropwizard.metrics:metrics-annotation:${dropwizard_metrics_version}"
+    api "io.dropwizard.metrics:metrics-jakarta-servlets:${dropwizard_metrics_version}"
+    api "io.dropwizard.metrics:metrics-graphite:${dropwizard_metrics_version}"
+    // ryantenney metrics-spring removed — replaced by custom AOP metrics config
+
+    /*
+     * Prometheus - https://prometheus.io/docs
+     */
+    api "io.prometheus:simpleclient:${prometheus_jvm_client_version}"
+    api "io.prometheus:simpleclient_dropwizard:${prometheus_jvm_client_version}"
+    api "io.prometheus:simpleclient_servlet_jakarta:${prometheus_jvm_client_version}"
+
+    /*
+     * GUAVA
+     * EventBus, FluentIterables, ListenableFutures and more
+     */
+    api "com.google.guava:guava:${guava_version}"
+
+    /*
+     * APACHE COMMONS
+     * Logging, StringUtils, RandomStringUtils, IOUtils, and more
+     */
+    api "org.apache.commons:commons-collections4:${commons_collections4_version}"
+    api "commons-io:commons-io:${commonsio_version}"
+    api "commons-validator:commons-validator:${commonsvalidator_version}"
+    api "org.apache.commons:commons-lang3:${commonsLang_version}"
+    api "commons-codec:commons-codec:${commons_codec_version}"
+    testImplementation "org.apache.commons:commons-text:${commonsText_version}"
+
+    /*
+     * JACKSON SERIALIZATION
+     * YAML via SnakeYaml
+     * Blackbird for faster serialization
+     * Guava integration
+     * Smile for binary serialization
+     * Jersey integration
+     * Jaxb annotation support
+     */
+    implementation "com.fasterxml.jackson.core:jackson-core:${jackson_version}"
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jackson_version}"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-guava:${jackson_version}"
+    implementation "com.fasterxml.jackson.module:jackson-module-jaxb-annotations:${jackson_version}"
+    implementation "com.fasterxml.jackson.module:jackson-module-blackbird:${jackson_version}"
+    implementation "com.fasterxml.jackson.dataformat:jackson-dataformat-smile:${jackson_version}"
+    implementation "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jackson_version}"
+    implementation "com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:${jackson_version}"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jackson_version}"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:${jackson_version}"
+    implementation "com.fasterxml.jackson.module:jackson-module-kotlin:${jackson_version}"
+    implementation "org.yaml:snakeyaml:${snakeyaml_version}"
+
+    /*
+     * @Inject and @Nullable support
+     */
+    implementation "jakarta.inject:jakarta.inject-api:${jakarta_inject_version}"
+
+    /*
+     * Hibernate Validator
+     */
+    implementation "org.hibernate.validator:hibernate-validator:${hibernate_validator_version}"
+    implementation "jakarta.el:jakarta.el-api:${jakarta_el_api_version}"
+    implementation "org.glassfish.expressly:expressly:${expressly_version}"
+
+    /*
+     * HAZELCAST - DISTRIBUTED DATA GRID
+     * Transparent http clustering, distributed java.util collections
+     */
+    api "com.hazelcast:hazelcast:${hazelcast_version}"
+    api "com.hazelcast:hazelcast-spring:${hazelcast_version}"
+    api 'javax.cache:cache-api:1.1.1'
+
+    /*
+     * EMBEDDED JETTY FOR LOCAL TESTING
+     * TODO: Add support for Tomcat
+     * TODO: Integrate with application plugin for standalone deployment
+     */
+    implementation "org.ow2.asm:asm:${asm_version}"
+    api "org.eclipse.jetty:jetty-server:${jetty_version}"
+//    api "org.eclipse.jetty.aggregate:jetty-all:${jetty_version}"
+    //TODO: Once GA version of jetty-jsp is released update version.
+    implementation "org.eclipse.jetty:jetty-alpn-java-server:${jetty_version}"
+    implementation "org.eclipse.jetty.http2:jetty-http2-server:${jetty_version}"
+    implementation "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jetty_version}"
+    implementation "org.eclipse.jetty.ee10:jetty-ee10-servlet:${jetty_version}"
+    implementation "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jetty_version}"
+
+    implementation "io.netty:netty-transport-native-epoll:${netty_epoll_version}:${netty_os_arch}"
+
+    /*
+     * JAVAMAIL
+     * Java email client.
+     */
+    api "org.jodd:jodd-mail:${jodd_mail_version}"
+    api "jakarta.mail:jakarta.mail-api:${jakarta_mail_api}"
+    implementation "org.eclipse.angus:angus-mail:${angus_mail_version}"
+    api "com.samskivert:jmustache:1.15"
+
+    /*
+     * GreenMail
+     * http://www.icegreen.com/greenmail/
+     * https://github.com/greenmail-mail-test/greenmail
+     *
+     * A library that provides a simple POP3/IMAP/SMTP mail server, and makes writing unit/integration tests easy for
+     * testing sending/receiving emails against a running mail server.
+     */
+    testImplementation "com.icegreen:greenmail:${greenmail_version}"
+
+    /*
+     * Cassandra (removed: Cassandra is not used, snappy/lz4 not imported anywhere)
+     */
+    // implementation "org.xerial.snappy:snappy-java:${snappy_version}"
+    // implementation "org.lz4:lz4-java:${lz4_version}"
+    /*
+     * Postgres
+     */
+
+    api "com.zaxxer:HikariCP:${hikariCP_version}"
+    api "org.postgresql:postgresql:${postgresql_version}"
+
+    api "com.google.code.findbugs:jsr305:${findbugs_jsr305_version}"
+    api "jakarta.annotation:jakarta.annotation-api:${jakarta_annotation_version}"
+    api "jakarta.validation:jakarta.validation-api:${jakarta_validation_api_version}"
+
+    implementation fileTree(dir: "lib/", include: "*.jar")
+
+
+    api "com.squareup.retrofit2:retrofit:${retrofit2_version}"
+
+    /*
+     * WEBSOCKET DEPENDENCIES
+     */
+    api "org.springframework:spring-websocket:${project.spring_framework_version}"
+    api "org.springframework:spring-messaging:${project.spring_framework_version}"
+    api "org.springframework.integration:spring-integration-websocket:${project.spring_websocket_version}"
+
+    /*
+     * TESTING
+     */
+    testImplementation "junit:junit:${junit_version}"
+    testImplementation "org.mockito:mockito-core:${mockito_version}"
+    if( (project.hasProperty('subModule') && project.subModule) || (project.hasProperty('developmentMode') && project.developmentMode) ) {
+        testImplementation(project(path: ":rhizome-client", configuration: "tests"))
+        api(project(path: ":rhizome-client"))
+    } else {
+        testImplementation "com.openlattice:rhizome-client:${rhizome_client_version}:tests"
+        api "com.openlattice:rhizome-client:${rhizome_client_version}"
+    }
+
+    // Standalone JWT library (not the Auth0 platform SDK) -- used for HS256 signing/verification
+    api "com.auth0:java-jwt:${auth0_java_jwt_version}"
+
+    api "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs += chronicle_jvm_compile_module_args
+}
+
+tasks.withType(Test) {
+    jvmArgs += chronicle_jvm_test_module_args
+}
+
+// explicitApi() and allWarningsAsErrors skipped: rhizome source files are not modified by this project
+// Warnings exist in rhizome-client (dependency) source that would fail -Werror
+// (shared KotlinCompile options come from gradles/chronicle.gradle)
+
+eclipse {
+    ext.downloadSources = true
+    ext.downloadJavadoc = true
+    ext.sourceCompatibility = JavaVersion.VERSION_21
+    ext.targetCompatibility = JavaVersion.VERSION_21
+}
+

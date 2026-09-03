@@ -1,0 +1,12 @@
+instance-name: "test"
+password: "rhizome-test-hazelcast"
+scheduled-executors:
+  - name: "test-scheduled-executor"
+    durability: 1
+    capacity: 128
+    pool-size: 1024
+durable-executors:
+  - name: "test-durable-executor"
+    durability: 1
+    capacity: 128
+    pool-size: 1024

@@ -1,0 +1,292 @@
+package com.geekbeast.rhizome.core;
+
+import static com.google.common.base.Preconditions.checkState;
+
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.health.HealthCheckRegistry;
+import io.dropwizard.metrics.servlets.AdminServlet;
+import io.dropwizard.metrics.servlets.HealthCheckServlet;
+import io.dropwizard.metrics.servlets.MetricsServlet;
+import com.geekbeast.rhizome.configuration.ConfigurationConstants.Profiles;
+import com.geekbeast.rhizome.configuration.RhizomeConfiguration;
+import com.geekbeast.rhizome.configuration.jetty.JettyConfiguration;
+import com.geekbeast.rhizome.configuration.servlets.DispatcherServletConfiguration;
+import com.geekbeast.rhizome.pods.AsyncPod;
+import com.geekbeast.rhizome.pods.ConfigurationPod;
+import com.geekbeast.rhizome.pods.JettyContainerPod;
+import com.geekbeast.rhizome.pods.LoamPod;
+import com.geekbeast.rhizome.pods.MetricsPod;
+import com.geekbeast.rhizome.services.ServiceState;
+import com.geekbeast.rhizome.startup.Requirement;
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+import com.google.common.eventbus.EventBus;
+import com.google.common.io.Resources;
+// hazelcast-wm removed (jakarta.servlet only, session clustering unused with JWT auth)
+import io.prometheus.client.CollectorRegistry;
+import org.eclipse.jetty.ee10.servlet.DefaultServlet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.support.AbstractApplicationContext;
+import org.springframework.web.WebApplicationInitializer;
+import org.springframework.web.context.ContextLoaderListener;
+import org.springframework.web.context.request.RequestContextListener;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+import org.springframework.web.servlet.DispatcherServlet;
+
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.FilterRegistration;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRegistration;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Note: if using jetty, jetty creates an instance of this class with a no-arg constructor in order to call onStartup
+ * TODO: break out WebApplicationInitializer's onStartup to a different class because of Jetty issue
+ */
+public class Rhizome implements WebApplicationInitializer {
+    protected static final Class<?>[]                            REQUIRED_RHIZOME_PODS         = new Class<?>[] {
+            ConfigurationPod.class,
+            MetricsPod.class,
+            AsyncPod.class };
+    protected static final Lock                                  startupLock                   = new ReentrantLock();
+    private static final   Logger                                logger                        = LoggerFactory
+            .getLogger( Rhizome.class );
+    private static final   String                                HAZELCAST_SESSION_FILTER_NAME = "hazelcastSessionFilter";
+    protected static       AnnotationConfigWebApplicationContext rhizomeContext                = null;
+
+    protected final AnnotationConfigWebApplicationContext context;
+    private         JettyLoam                             jetty;
+    private         EventBus                              eventBus;
+
+    public Rhizome() {
+        this( new Class<?>[] {} );
+    }
+
+    public Rhizome( Class<?>... pods ) {
+        this( JettyContainerPod.class, pods );
+    }
+
+    public Rhizome( Class<? extends LoamPod> loamPodClass, Class<?>... pods ) {
+        this( new AnnotationConfigWebApplicationContext(), loamPodClass, pods );
+    }
+
+    public Rhizome(
+            AnnotationConfigWebApplicationContext context,
+            Class<? extends LoamPod> loamPodClass,
+            Class<?>... pods ) {
+        this.context = context;
+        intercrop( pods );
+        if ( loamPodClass != null ) {
+            intercrop( loamPodClass );
+        }
+        intercrop( getDefaultServicePods() );
+    }
+
+    @Override
+    public void onStartup( ServletContext servletContext ) throws ServletException {
+        Preconditions.checkNotNull( rhizomeContext, "Rhizome context cannot be null for startup." );
+
+        RhizomeConfiguration configuration = rhizomeContext.getBean( RhizomeConfiguration.class );
+        JettyConfiguration jettyConfiguration = rhizomeContext.getBean( JettyConfiguration.class );
+
+        servletContext.addListener( new ContextLoaderListener( rhizomeContext ) );
+        servletContext.addListener( new RequestContextListener() );
+
+        // Register the health check registry.
+        servletContext.setAttribute(
+                HealthCheckServlet.HEALTH_CHECK_REGISTRY,
+                rhizomeContext.getBean( "getHealthCheckRegistry", HealthCheckRegistry.class ) );
+        servletContext.setAttribute(
+                MetricsServlet.METRICS_REGISTRY,
+                rhizomeContext.getBean( "getMetricRegistry", MetricRegistry.class ) );
+
+        /*
+         * Setup metrics admin servlet
+         */
+
+        ServletRegistration.Dynamic adminServlet = servletContext.addServlet( "admin", AdminServlet.class );
+        adminServlet.setLoadOnStartup( 1 );
+        adminServlet.addMapping( "/admin/*" );
+        adminServlet.setInitParameter( "show-jvm-metrics", "true" );
+
+        /*
+         * Setup prometheus servlet
+         */
+
+        ServletRegistration.Dynamic prometheusServlet = servletContext.addServlet(
+                "prometheus",
+                new io.prometheus.client.servlet.jakarta.exporter.MetricsServlet( CollectorRegistry.defaultRegistry )
+        );
+        prometheusServlet.setLoadOnStartup( 1 );
+        prometheusServlet.addMapping( "/prometheus/*" );
+
+        /*
+         * Atmosphere Servlet
+         */
+
+        // TODO: Add support for atmosphere servlet.
+
+        /*
+         * Default Servlet
+         */
+        if ( jettyConfiguration.isDefaultServletEnabled() ) {
+            servletContext.setInitParameter("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
+            ServletRegistration.Dynamic defaultServlet = servletContext.addServlet( "default", new DefaultServlet() );
+            defaultServlet.addMapping( new String[] { "/*" } );
+            defaultServlet.setLoadOnStartup( 1 );
+            defaultServlet.setAsyncSupported( true );
+        }
+
+        registerDispatcherServlets( servletContext );
+    }
+
+    private void registerDispatcherServlets( ServletContext servletContext ) {
+        Map<String, DispatcherServletConfiguration> dispatcherServletsConfigs = rhizomeContext.getBeansOfType(
+                DispatcherServletConfiguration.class,
+                false,
+                true );
+        for ( Entry<String, DispatcherServletConfiguration> configPair : dispatcherServletsConfigs.entrySet() ) {
+            DispatcherServletConfiguration configuration = configPair.getValue();
+            AnnotationConfigWebApplicationContext dispatchServletContext = new AnnotationConfigWebApplicationContext();
+            logger.info( " Registering dispatcher servlet: {}", configuration );
+            dispatchServletContext.setParent( rhizomeContext );
+            dispatchServletContext.register( configuration.getPods().toArray( new Class<?>[ 0 ] ) );
+            ServletRegistration.Dynamic dispatcher = servletContext.addServlet(
+                    configuration.getServletName(),
+                    new DispatcherServlet( dispatchServletContext ) );
+            Preconditions.checkNotNull( dispatcher,
+                    "A DispatcherServlet with this name has already been registered and fully configured" );
+            if ( configuration.getLoadOnStartup().isPresent() ) {
+                dispatcher.setLoadOnStartup( configuration.getLoadOnStartup().get() );
+            }
+            dispatcher.setAsyncSupported( true );
+            dispatcher.addMapping( configuration.getMappings() );
+        }
+    }
+
+    public AnnotationConfigWebApplicationContext getContext() {
+        return context;
+    }
+
+    public <T> T harvest( Class<T> clazz ) {
+        return context.getBean( clazz );
+    }
+
+    public void intercrop( Class<?>... pods ) {
+        if ( pods != null && pods.length > 0 ) {
+            context.register( pods );
+        }
+    }
+
+    public void sprout( String... activeProfiles ) {
+        shoot( context, activeProfiles );
+
+        /*
+         * This will trigger creation of Jetty, so we:
+         * 1) Lock on singleton context
+         * 2) switch in the correct singleton context
+         * 3) set back to null and release lock once Jetty has finished starting.
+         */
+        startupLock.lock();
+        try {
+            checkState(
+                    rhizomeContext == null,
+                    "Rhizome context should be null before startup of startup." );
+            rhizomeContext = context;
+            context.refresh();
+            eventBus = rhizomeContext.getBean( EventBus.class );
+            startJetty();
+        } catch ( Exception e ) {
+            logger.error( "Something went wrong during startup", e );
+            System.exit( 1 );
+        } finally {
+            try {
+                rhizomeContext = null;
+                if(jetty!=null) {
+                    showBannerIfStartedOrExit( jetty, context );
+                } else {
+                    logger.error("Something went wrong before jetty was initialized. In the past this has happened due to circular dependencies in spring beans that overwhelm the stack.");
+                }
+            } finally {
+                // Guarantee release on EVERY path: the banner/exit logic above can throw
+                // (or System.exit), which would otherwise leak the startup lock.
+                // CodeQL java/unreleased-lock requires unlock() to be unconditionally reachable.
+                startupLock.unlock();
+            }
+            eventBus.post( ServiceState.RUNNING );
+        }
+    }
+
+    protected void startJetty() throws Exception {
+        JettyConfiguration jettyConfig = Preconditions.checkNotNull( rhizomeContext.getBean( JettyConfiguration.class ),
+                "Jetty configuration cannot be null" );
+        this.jetty = new JettyLoam( jettyConfig );
+
+        eventBus.post( ServiceState.JETTY_STARTING );
+
+        jetty.start();
+
+        eventBus.post( ServiceState.JETTY_STARTED );
+    }
+
+    public void wilt() throws Exception {
+        jetty.stop();
+        context.close();
+    }
+
+    public Class<?>[] getDefaultServicePods() {
+        return REQUIRED_RHIZOME_PODS;
+    }
+
+    public static void shoot( AbstractApplicationContext context, String... activeProfiles ) {
+        boolean localProfile = false;
+        for ( String profile : activeProfiles ) {
+            if ( Profiles.LOCAL_CONFIGURATION_PROFILE.equals( profile ) ) {
+                localProfile = true;
+                logger.info( "Using Local profile for configuration." );
+            }
+
+            context.getEnvironment().addActiveProfile( profile );
+        }
+
+        if ( !localProfile ) {
+            context.getEnvironment().addActiveProfile( Profiles.LOCAL_CONFIGURATION_PROFILE );
+        }
+    }
+
+    static void showBannerIfStartedOrExit( JettyLoam jetty, AbstractApplicationContext context ) {
+        checkState( jetty.getServer().isStarted(), "Jetty server is not started." );
+        showBannerIfStartedOrExit( context );
+    }
+
+    static void showBannerIfStartedOrExit( AbstractApplicationContext context ) {
+        checkState( context.isRunning(), "Application context is not running." );
+        checkState( context.isActive(), "Application context is not active." );
+        checkState( startupRequirementsSatisfied( context ), "Startup requirements have not been met." );
+
+        showBanner();
+    }
+
+    public static void showBanner() {
+        try {
+            logger.info( "\n\n{}\n\n", Resources.toString( Resources.getResource( "banner.txt" ), Charsets.UTF_8 ) );
+        } catch ( IOException e ) {
+            logger.warn( "No startup banner found." );
+        }
+    }
+
+    public static boolean startupRequirementsSatisfied( AbstractApplicationContext context ) {
+        return context.getBeansOfType( Requirement.class )
+                .values()
+                .parallelStream()
+                .allMatch( Requirement::isSatisfied );
+    }
+}

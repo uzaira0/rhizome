@@ -1,0 +1,22 @@
+##
+# Rhizome Bootstrap Configuration
+##
+
+# Set to false to disable persistence 
+enable-persistence:  false
+hazelcast:
+  instance-name: "test"
+  # Non-default password: HazelcastConfiguration fails fast if left at the
+  # built-in DEFAULT_PASSWORD ("reticulating splines"). Test-only value.
+  password: "rhizome-test-hazelcast"
+  durable-executors:
+    - name: "_rhizome_job_service_"
+      pool-size: 8
+      capacity: 128
+      durability: 1
+  scheduled-executors:
+    - name: "hazelcast_scheduled_tasks"
+      pool-size: 8
+      capacity: 128
+      durability: 1
+  cp-member-count: 0

@@ -1,0 +1,15 @@
+.classpath
+.project
+.gradle/
+.settings/
+.idea/
+bin/
+build/
+artifacts/
+.project
+.factorypath
+/generated_src/
+*.iml
+target/
+out/
+

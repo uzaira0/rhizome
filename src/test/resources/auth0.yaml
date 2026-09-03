@@ -1,0 +1,13 @@
+domain: "localhost"
+clientId: "test-client-id"
+clientSecret: "test-jwt-secret-for-rhizome-tests"
+# Must match the self-hosted HS256 token minted by AuthenticationTest.createTestToken
+# (issuer/audience/secret/algorithm). The JwtDecoder in Auth0SecurityPod validates the
+# bearer token against the first entry below; any mismatch rejects every request with 401.
+configurations:
+  - issuer: "https://localhost/"
+    audience: "test-client-id"
+    secret: "test-jwt-secret-for-rhizome-tests"
+    signingAlgorithm: "HS256"
+    base64EncodedSecret: false
+managementApiUrl: "localhost"

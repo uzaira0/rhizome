@@ -1,0 +1,32 @@
+// Standalone builds need plugin versions here; inside the root composite the
+// root settings.gradle.kts pluginManagement wins. Keep versions in lockstep
+// with the root file (and chronicle-server/settings.gradle).
+pluginManagement {
+    plugins {
+        id 'org.jetbrains.kotlin.jvm' version '2.3.21'
+        id 'org.jetbrains.kotlin.plugin.spring' version '2.3.21'
+        id 'org.jetbrains.dokka' version '2.2.0'
+        id 'com.github.spotbugs' version '6.5.5'
+        id 'org.owasp.dependencycheck' version '12.2.2'
+        id 'org.hidetake.swagger.generator' version '2.19.2'
+        id 'com.github.johnrengelman.shadow' version '8.1.1'
+        id 'com.github.jk1.dependency-license-report' version '3.1.2'
+    }
+    repositories {
+        maven { url = uri('https://plugins.gradle.org/m2/') }
+        mavenCentral()
+    }
+}
+
+rootProject.name='rhizome'
+
+// Standalone builds resolve rhizome-client from the sibling monorepo checkout
+// (same pattern as chronicle-server/settings.gradle). Overridable with
+// -PrhizomeClientDir=... or RHIZOME_CLIENT_DIR.
+def rhizomeClientDir = gradle.startParameter.projectProperties['rhizomeClientDir'] ?:
+        System.getenv('RHIZOME_CLIENT_DIR') ?: '../rhizome-client'
+if (!file(rhizomeClientDir).exists()) {
+    throw new GradleException("Composite checkout not found for rhizome-client: ${file(rhizomeClientDir)}")
+}
+include ':rhizome-client'
+project(':rhizome-client').projectDir = file(rhizomeClientDir)
