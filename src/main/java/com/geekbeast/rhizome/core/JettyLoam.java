@@ -162,11 +162,13 @@ public class JettyLoam implements Loam {
         final var httpConnectionFactory = new HttpConnectionFactory(http_config);
 
         if (!configuration.requireSSL()) {
-            final var http2CServerConnectionFactory = new HTTP2CServerConnectionFactory(http_config);
-            ServerConnector http = new ServerConnector(server,
-                    httpConnectionFactory,
-                    http2CServerConnectionFactory
-            );
+            // http2-enabled=false must also disable cleartext h2c, otherwise the connector keeps
+            // accepting HTTP/2 traffic the operator asked to turn off.
+            final ServerConnector http = configuration.isHttp2Enabled()
+                    ? new ServerConnector(server,
+                            httpConnectionFactory,
+                            new HTTP2CServerConnectionFactory(http_config))
+                    : new ServerConnector(server, httpConnectionFactory);
 
             http.setPort( configuration.getHttpPort() );
 
@@ -187,9 +189,13 @@ public class JettyLoam implements Loam {
             if (StringUtils.isNotBlank(certAlias)) {
                 contextFactory.setCertAlias(certAlias);
             }
-            contextFactory.setKeyManagerPassword(config.getKeyManagerPassword().get());
-            contextFactory.setWantClientAuth(configuration.wantClientAuth());
-            // contextFactory.setNeedClientAuth( configuration.needClientAuth() );
+            // The key-manager password is optional in configuration; dereferencing an absent one
+            // crashes startup with NoSuchElementException on an otherwise complete SSL config.
+            config.getKeyManagerPassword().ifPresent(contextFactory::setKeyManagerPassword);
+            // Order matters: Jetty's setNeedClientAuth(true) also implies want, and a later
+            // setWantClientAuth(false) would clear the requirement. Apply want first, need last.
+            contextFactory.setWantClientAuth(configuration.wantClientAuth() || configuration.needClientAuth());
+            contextFactory.setNeedClientAuth(configuration.needClientAuth());
 
             final HttpConfiguration https_config = new HttpConfiguration(http_config);
             final var src = new SecureRequestCustomizer();
