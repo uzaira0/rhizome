@@ -86,31 +86,28 @@ open class StatementHolderSupplier @JvmOverloads constructor(
     @Suppress("TooGenericExceptionCaught")
     override fun get(): StatementHolder {
         val connection = hds.connection //okay to fail + propagate
-        connection.autoCommit = autoCommit
-
-        val statement = setStatementTimeout(buildStatement(connection)) //okay to fail + propagate
-
-        statement.fetchSize = fetchSize
-
-        val rs = try {
-            execute(statement)
-        } catch (ex: Exception) {
-            logger.error("Error while executing sql: {}. The following exception was thrown: ", sql, ex)
-            try {
-                if (!connection.autoCommit) {
-                    connection.rollback()
-                }
-            } finally {
-                connection.close() // Close connection on error regardless of autoCommit to prevent leaks
+        var statement: Statement? = null
+        var resultSet: ResultSet? = null
+        try {
+            connection.autoCommit = autoCommit
+            statement = buildStatement(connection)
+            setStatementTimeout(statement)
+            statement.fetchSize = fetchSize
+            resultSet = execute(statement)
+            return if (longRunningQueryLimit == 0L) {
+                StatementHolder(connection, statement, resultSet)
+            } else {
+                StatementHolder(connection, statement, resultSet, longRunningQueryLimit)
             }
-            logger.error("Closed the connection after error (rolled back if non-autoCommit)")
-            throw ex
-        }
-
-        return if (longRunningQueryLimit == 0L) {
-            StatementHolder(connection, statement, rs)
-        } else {
-            StatementHolder(connection, statement, rs, longRunningQueryLimit)
+        } catch (failure: Throwable) {
+            // Ownership passes to the holder only after all initialization succeeds.
+            listOfNotNull(resultSet, statement).forEach { resource ->
+                try { resource.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            }
+            try { if (!connection.autoCommit) connection.rollback() }
+            catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            try { connection.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            throw failure
         }
     }
 }
@@ -137,8 +134,13 @@ class PreparedStatementHolderSupplier(
     @SuppressFBWarnings(value = ["SECSQLIJDBC"], justification = "Provided by caller.")
     override fun buildStatement(connection: Connection): Statement {
         val ps = connection.prepareStatement(sql)
-        bind(ps)
-        return ps
+        try {
+            bind(ps)
+            return ps
+        } catch (failure: Throwable) {
+            try { ps.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            throw failure
+        }
     }
 }
 
