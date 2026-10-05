@@ -163,19 +163,34 @@ class PostgresIterator<T> @Throws(SQLException::class)
     private var expiration: Long = 0
 
     private var notExhausted: Boolean = false
-    private val watchdogFuture: ScheduledFuture<*>
+
+    // Null when the result was empty at construction. Every terminal path goes through finish(),
+    // which cancels it: a periodic task left behind keeps this iterator (and its holder) reachable
+    // from the executor queue forever.
+    @Volatile
+    private var watchdogFuture: ScheduledFuture<*>? = null
 
     init {
-        notExhausted = this.rs.next()
+        notExhausted = try {
+            this.rs.next()
+        } catch (e: SQLException) {
+            rsh.close()
+            throw e
+        }
         updateExpiration()
 
-        if (!notExhausted) {
+        if (notExhausted) {
+            watchdogFuture = WATCHDOG_EXECUTOR.scheduleAtFixedRate(
+                { runWatchdogCheck() }, timeoutMillis, timeoutMillis, TimeUnit.MILLISECONDS
+            )
+        } else {
             rsh.close()
         }
+    }
 
-        watchdogFuture = WATCHDOG_EXECUTOR.scheduleAtFixedRate(
-            { runWatchdogCheck() }, timeoutMillis, timeoutMillis, TimeUnit.MILLISECONDS
-        )
+    private fun finish() {
+        watchdogFuture?.cancel(false)
+        rsh.close()
     }
 
     // reason: boundary catch — a scheduled watchdog must swallow+log any failure so it never kills the shared executor
@@ -184,7 +199,9 @@ class PostgresIterator<T> @Throws(SQLException::class)
         try {
             if (rsh.isOpen && (System.currentTimeMillis() > expiration || !notExhausted)) {
                 logger.warn("PostgresIterator is closing because it has expired, even though it is not exhausted.")
-                rsh.close()
+            }
+            if (!rsh.isOpen || System.currentTimeMillis() > expiration || !notExhausted) {
+                finish()
             }
         } catch (e: Exception) {
             logger.error("Error in watchdog check", e)
@@ -223,7 +240,7 @@ class PostgresIterator<T> @Throws(SQLException::class)
         } finally {
             try {
                 if (!notExhausted) {
-                    rsh.close()
+                    finish()
                 }
             } finally {
                 lock.unlock()
@@ -234,7 +251,6 @@ class PostgresIterator<T> @Throws(SQLException::class)
     }
 
     override fun close() {
-        watchdogFuture.cancel(false)
-        rsh.close()
+        finish()
     }
 }

@@ -21,6 +21,7 @@
 package com.geekbeast.postgres
 
 import com.geekbeast.postgres.streams.BasePostgresIterable
+import com.geekbeast.postgres.streams.PostgresIterator
 import com.geekbeast.postgres.streams.StatementHolder
 import org.junit.Assert
 import org.junit.Test
@@ -29,6 +30,7 @@ import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Supplier
 
@@ -52,5 +54,25 @@ class BasePostgresIterableTests {
         Mockito.doAnswer { closeCount.getAndIncrement() }.`when`(connection).close()
         pi.iterator()
         Assert.assertEquals(3, closeCount.get().toLong())
+    }
+
+    // Regression V-27: an iterator consumed to the end (the for-loop / toList path, which never
+    // calls close()) left its periodic watchdog scheduled forever, pinning the iterator and holder.
+    @Test
+    @Throws(SQLException::class)
+    fun testExhaustionCancelsWatchdog() {
+        val rs = Mockito.mock(ResultSet::class.java)
+        val stmt = Mockito.mock(Statement::class.java)
+        val connection = Mockito.mock(Connection::class.java)
+        Mockito.`when`(rs.next()).thenReturn(true, false)
+        val it = BasePostgresIterable(Supplier { StatementHolder(connection, stmt, rs) }) { 1 }.iterator()
+        val field = PostgresIterator::class.java.getDeclaredField("watchdogFuture").apply { isAccessible = true }
+        val future = field.get(it) as ScheduledFuture<*>
+        Assert.assertFalse(future.isCancelled)
+
+        Assert.assertEquals(listOf(1), it.asSequence().toList())
+
+        Assert.assertTrue(future.isCancelled)
+        Mockito.verify(connection).close()
     }
 }
