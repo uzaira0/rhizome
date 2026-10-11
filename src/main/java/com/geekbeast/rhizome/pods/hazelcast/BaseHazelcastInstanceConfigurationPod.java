@@ -66,6 +66,7 @@ public class BaseHazelcastInstanceConfigurationPod {
             Config config = new Config( hzConfiguration.getInstanceName() );
 
             config
+                    .setProperty( "hazelcast.phone.home.enabled", "false" )
                     .setProperty( "hazelcast.logging.type", "slf4j" )
                     .setProperty( "hazelcast.slow.operation.detector.stacktrace.logging.enabled", "true" )
                     .setProperty( "hazelcast.map.load.chunk.size", "100000" )
@@ -74,6 +75,12 @@ public class BaseHazelcastInstanceConfigurationPod {
                     .setMapConfigs( mapConfigs() )
                     .setQueueConfigs( queueConfigs( config.getQueueConfig( defaultQueueName ) ) )
                     .setNetworkConfig( networkConfig( hzConfiguration ) );
+
+            config.getMapConfigs().values().forEach( map -> {
+                if ( map.getMapStoreConfig() != null ) {
+                    map.getMapStoreConfig().setEnabled( rhizomeConfiguration.isPersistenceEnabled() );
+                }
+            } );
 
             hzConfiguration
                     .getScheduledExecutors()
@@ -191,6 +198,9 @@ public class BaseHazelcastInstanceConfigurationPod {
     protected static NetworkConfig networkConfig( HazelcastConfiguration hzConfiguration ) {
         return new NetworkConfig()
                 .setPort( hzConfiguration.getPort() )
+                .setInterfaces( new com.hazelcast.config.InterfacesConfig()
+                        .setEnabled( !hzConfiguration.getInterfaces().isEmpty() )
+                        .setInterfaces( hzConfiguration.getInterfaces() ) )
                 .setJoin( getJoinConfig( hzConfiguration.getHazelcastSeedNodes() ) );
     }
 

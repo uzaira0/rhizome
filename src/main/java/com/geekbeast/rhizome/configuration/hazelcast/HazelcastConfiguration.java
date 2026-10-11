@@ -11,26 +11,24 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
+ * Hazelcast OSS does not authenticate members or clients. Restrict the Hazelcast TCP port
+ * (5701 by default, including auto-incremented member ports) with a host firewall or
+ * private network ACL allowing only Chronicle members and trusted application clients.
+ * Cluster names provide discovery grouping, not authentication.
+ *
  * @author Matthew Tamayo-Rios &lt;matthew@kryptnostic.com&gt;
  */
 public class HazelcastConfiguration {
-    private static final Logger logger = LoggerFactory.getLogger( HazelcastConfiguration.class );
-
     public static final    String DEFAULT_GROUP_NAME       = "rhizome-dev";
     public static final    String DEFAULT_INSTANCE_NAME    = "rhizome-default";
-    public static final    String DEFAULT_PASSWORD         = "reticulating splines";
     protected static final String CP_MEMBER_COUNT_PROPERTY = "cp-member-count";
     protected static final String CP_GROUP_SIZE_PROPERTY   = "cp-group-size";
-    private static final   String REPLICATION_FACTOR       = "replication-factor";
     private static final   String SEED_NODES_PROPERTY      = "seed-nodes";
     private static final   String NAME_PROPERTY            = "instance-name";
     private static final   String GROUP_PROPERTY           = "group";
-    private static final   String PASSWORD_PROPERTY        = "password";
     private static final   String PORT_PROPERTY            = "port";
+    private static final   String INTERFACES_PROPERTY      = "interfaces";
     private static final   String SERVER_ROLE_PROPERTY     = "server";
     private static final   String DURABLE_EXECUTORS        = "durable-executors";
     private static final   String SCHEDULED_EXECUTORS      = "scheduled-executors";
@@ -40,15 +38,13 @@ public class HazelcastConfiguration {
     public static final    boolean      DEFAULT_SERVER_ROLE        = true;
     protected static final Integer      CP_MEMBER_COUNT_DEFAULT    = 3;
     private static final   List<String> SEED_DEFAULT               = ImmutableList.of( "127.0.0.1" );
-    private static final   int          REPLICATION_FACTOR_DEFAULT = 2;
     // @formatter:on
 
     private final List<String>                                   hazelcastSeedNodes;
-    private final int                                            replicationFactor;
     private final String                                         instanceName;
     private final String                                         group;
-    private final String                                         password;
     private final int                                            port;
+    private final List<String>                                   interfaces;
     private final boolean                                        server;
     private final Optional<List<ScheduledExecutorConfiguration>> scheduledExecutors;
     private final Integer                                        cpMemberCount;
@@ -59,43 +55,31 @@ public class HazelcastConfiguration {
     public HazelcastConfiguration(
             @JsonProperty( NAME_PROPERTY ) Optional<String> instanceName,
             @JsonProperty( GROUP_PROPERTY ) Optional<String> group,
-            @JsonProperty( PASSWORD_PROPERTY ) Optional<String> password,
             @JsonProperty( PORT_PROPERTY ) Optional<Integer> port,
             @JsonProperty( SERVER_ROLE_PROPERTY ) Optional<Boolean> role,
             @JsonProperty( SEED_NODES_PROPERTY ) Optional<List<String>> hazelcastSeedNodes,
-            @JsonProperty( REPLICATION_FACTOR ) Optional<Integer> replicationFactor,
             @JsonProperty( SCHEDULED_EXECUTORS ) Optional<List<ScheduledExecutorConfiguration>> scheduledExecutors,
             @JsonProperty( DURABLE_EXECUTORS ) Optional<List<DurableExecutorConfiguration>> durableExecutors,
             @JsonProperty( CP_MEMBER_COUNT_PROPERTY ) Optional<Integer> cpMemberCount,
-            @JsonProperty( CP_GROUP_SIZE_PROPERTY ) Optional<Integer> cpGroupSize) {
+            @JsonProperty( CP_GROUP_SIZE_PROPERTY ) Optional<Integer> cpGroupSize,
+            @JsonProperty( INTERFACES_PROPERTY ) Optional<List<String>> interfaces) {
 
         this.group = group.orElse( DEFAULT_GROUP_NAME );
-        this.password = password.orElse( DEFAULT_PASSWORD );
         this.port = port.orElse( DEFAULT_PORT );
+        this.interfaces = interfaces.orElse( ImmutableList.of() );
         this.server = role.orElse( DEFAULT_SERVER_ROLE );
         this.hazelcastSeedNodes = hazelcastSeedNodes.orElse( SEED_DEFAULT );
-        this.replicationFactor = replicationFactor.orElse( REPLICATION_FACTOR_DEFAULT );
         this.instanceName = instanceName.orElse( DEFAULT_INSTANCE_NAME );
         this.scheduledExecutors = scheduledExecutors;
         this.cpMemberCount = cpMemberCount.orElse( CP_MEMBER_COUNT_DEFAULT );
         this.cpGroupSize = cpGroupSize.orElse(this.cpMemberCount);
         this.durableExecutors = durableExecutors;
         checkState(this.cpGroupSize <= this.cpMemberCount, "CP Group size must be at least member count");
-        if ( DEFAULT_PASSWORD.equals( this.password ) ) {
-            throw new IllegalStateException(
-                    "Hazelcast default password must be changed before starting. "
-                    + "Set a custom password in the hazelcast configuration." );
-        }
     }
 
     @JsonProperty( SEED_NODES_PROPERTY )
     public List<String> getHazelcastSeedNodes() {
         return hazelcastSeedNodes;
-    }
-
-    @JsonProperty( REPLICATION_FACTOR )
-    public int getReplicationFactor() {
-        return replicationFactor;
     }
 
     @JsonProperty( NAME_PROPERTY )
@@ -108,14 +92,14 @@ public class HazelcastConfiguration {
         return group;
     }
 
-    @JsonProperty( PASSWORD_PROPERTY )
-    public String getPassword() {
-        return password;
-    }
-
     @JsonProperty( PORT_PROPERTY )
     public int getPort() {
         return port;
+    }
+
+    @JsonProperty( INTERFACES_PROPERTY )
+    public List<String> getInterfaces() {
+        return interfaces;
     }
 
     @JsonProperty( SERVER_ROLE_PROPERTY )
@@ -147,13 +131,13 @@ public class HazelcastConfiguration {
         if ( this == o ) { return true; }
         if ( !( o instanceof HazelcastConfiguration ) ) { return false; }
         HazelcastConfiguration that = (HazelcastConfiguration) o;
-        return replicationFactor == that.replicationFactor &&
+        return
                 port == that.port &&
                 server == that.server &&
                 Objects.equals( hazelcastSeedNodes, that.hazelcastSeedNodes ) &&
                 Objects.equals( instanceName, that.instanceName ) &&
                 Objects.equals( group, that.group ) &&
-                Objects.equals( password, that.password ) &&
+                Objects.equals( interfaces, that.interfaces ) &&
                 Objects.equals( scheduledExecutors, that.scheduledExecutors ) &&
                 Objects.equals( cpMemberCount, that.cpMemberCount ) &&
                 Objects.equals( durableExecutors, that.durableExecutors );
@@ -161,11 +145,10 @@ public class HazelcastConfiguration {
 
     @Override public int hashCode() {
         return Objects.hash( hazelcastSeedNodes,
-                replicationFactor,
                 instanceName,
                 group,
-                password,
                 port,
+                interfaces,
                 server,
                 scheduledExecutors,
                 cpMemberCount,
@@ -175,10 +158,8 @@ public class HazelcastConfiguration {
     @Override public String toString() {
         return "HazelcastConfiguration{" +
                 "hazelcastSeedNodes=" + hazelcastSeedNodes +
-                ", replicationFactor=" + replicationFactor +
                 ", instanceName='" + instanceName + '\'' +
                 ", group='" + group + '\'' +
-                ", password='[REDACTED]'" +
                 ", port=" + port +
                 ", server=" + server +
                 ", scheduledExecutors=" + scheduledExecutors +

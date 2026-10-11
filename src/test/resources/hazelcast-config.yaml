@@ -1,5 +1,4 @@
 instance-name: "test"
-password: "rhizome-test-hazelcast"
 scheduled-executors:
   - name: "test-scheduled-executor"
     durability: 1
