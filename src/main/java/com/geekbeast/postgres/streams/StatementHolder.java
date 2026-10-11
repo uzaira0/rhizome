@@ -100,9 +100,7 @@ public class StatementHolder implements Closeable {
 
             final var elapsed = sw.elapsed( TimeUnit.MILLISECONDS );
             if ( elapsed > this.longRunningQueryLimit ) {
-                logger.warn( "The following statement was involved in a long lived connection that took {} ms: {}",
-                        elapsed,
-                        statement.toString() );
+                logger.warn( "Postgres streaming query held a connection for {} ms", elapsed );
             }
 
             sw.stop();
@@ -117,7 +115,7 @@ public class StatementHolder implements Closeable {
         try {
             obj.close();
         } catch ( Exception e ) {
-            logger.error( "Unable to close obj {}", obj, e );
+            logger.error( "Unable to close {}", obj.getClass().getSimpleName(), e );
         }
     }
 

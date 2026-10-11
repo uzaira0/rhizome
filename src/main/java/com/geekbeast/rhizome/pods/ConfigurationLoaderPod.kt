@@ -16,7 +16,7 @@ interface ConfigurationLoader {
     fun <T> logAndLoad( name: String, clazz: Class<T> ): T {
         logger.debug("Loading {} configuration from {}", name, this.type() )
         val t = this.load( clazz )
-        logger.info("Using {} {} configuration: {}", this.type(), name, t.toString() )
+        logger.info("Using {} {} configuration ({})", this.type(), name, clazz.simpleName )
         return t
     }
     fun type(): String

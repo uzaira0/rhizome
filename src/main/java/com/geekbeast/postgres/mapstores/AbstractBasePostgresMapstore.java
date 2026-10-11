@@ -56,7 +56,6 @@ public abstract class AbstractBasePostgresMapstore<K, V> extends AbstractPostgre
     public void store( K key, V value ) {
         try ( Connection connection = hds.getConnection(); PreparedStatement insertRow = prepareInsert( connection ) ) {
             bind( insertRow, key, value );
-            logger.debug( "Insert query: {}", insertRow );
             insertRow.execute();
             handleStoreSucceeded( key, value );
         } catch ( SQLException e ) {
