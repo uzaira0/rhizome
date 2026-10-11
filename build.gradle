@@ -162,7 +162,7 @@ dependencies {
     // spring-security-ldap removed: never imported in source code
     // api "org.springframework.security:spring-security-ldap:${project.spring_security_version}"
     api "org.springframework.security:spring-security-config:${project.spring_security_version}"
-    api "org.springframework.security:spring-security-messaging:${project.spring_security_version}"
+    // spring-security-messaging removed: no messaging security configured
 
     //JDBI
     api "org.jdbi:jdbi3-core:${jdbi3_version}"
@@ -259,9 +259,9 @@ dependencies {
     //TODO: Once GA version of jetty-jsp is released update version.
     implementation "org.eclipse.jetty:jetty-alpn-java-server:${jetty_version}"
     implementation "org.eclipse.jetty.http2:jetty-http2-server:${jetty_version}"
-    implementation "org.eclipse.jetty.ee10:jetty-ee10-webapp:${jetty_version}"
-    implementation "org.eclipse.jetty.ee10:jetty-ee10-servlet:${jetty_version}"
-    implementation "org.eclipse.jetty.ee10:jetty-ee10-annotations:${jetty_version}"
+    implementation "org.eclipse.jetty.ee11:jetty-ee11-webapp:${jetty_version}"
+    implementation "org.eclipse.jetty.ee11:jetty-ee11-servlet:${jetty_version}"
+    implementation "org.eclipse.jetty.ee11:jetty-ee11-annotations:${jetty_version}"
 
     implementation "io.netty:netty-transport-native-epoll:${netty_epoll_version}:${netty_os_arch}"
 
@@ -273,16 +273,6 @@ dependencies {
     api "jakarta.mail:jakarta.mail-api:${jakarta_mail_api}"
     implementation "org.eclipse.angus:angus-mail:${angus_mail_version}"
     api "com.samskivert:jmustache:1.15"
-
-    /*
-     * GreenMail
-     * http://www.icegreen.com/greenmail/
-     * https://github.com/greenmail-mail-test/greenmail
-     *
-     * A library that provides a simple POP3/IMAP/SMTP mail server, and makes writing unit/integration tests easy for
-     * testing sending/receiving emails against a running mail server.
-     */
-    testImplementation "com.icegreen:greenmail:${greenmail_version}"
 
     /*
      * Cassandra (removed: Cassandra is not used, snappy/lz4 not imported anywhere)
@@ -310,7 +300,7 @@ dependencies {
      */
     api "org.springframework:spring-websocket:${project.spring_framework_version}"
     api "org.springframework:spring-messaging:${project.spring_framework_version}"
-    api "org.springframework.integration:spring-integration-websocket:${project.spring_websocket_version}"
+    // spring-integration-websocket removed: Spring Integration never used
 
     /*
      * TESTING
