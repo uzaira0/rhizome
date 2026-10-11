@@ -247,17 +247,12 @@ public class Rhizome implements WebApplicationInitializer {
     }
 
     public static void shoot( AbstractApplicationContext context, String... activeProfiles ) {
-        boolean localProfile = false;
         for ( String profile : activeProfiles ) {
-            if ( Profiles.LOCAL_CONFIGURATION_PROFILE.equals( profile ) ) {
-                localProfile = true;
-                logger.info( "Using Local profile for configuration." );
-            }
-
             context.getEnvironment().addActiveProfile( profile );
         }
-
-        if ( !localProfile ) {
+        if ( java.util.Arrays.stream( context.getEnvironment().getActiveProfiles() ).noneMatch(
+                profile -> Profiles.LOCAL_CONFIGURATION_PROFILE.equals( profile )
+                        || Profiles.KUBERNETES_CONFIGURATION_PROFILE.equals( profile ) ) ) {
             context.getEnvironment().addActiveProfile( Profiles.LOCAL_CONFIGURATION_PROFILE );
         }
     }

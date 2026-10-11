@@ -22,7 +22,7 @@ class DataSourceManager(
     private val dataSourceConfigurations: Map<String, PostgresConfiguration>,
     healthCheckRegistry: HealthCheckRegistry,
     metricRegistry: MetricRegistry
-) {
+) : AutoCloseable {
 
     companion object {
         private val logger = LoggerFactory.getLogger(DataSourceManager::class.java)
@@ -48,6 +48,10 @@ class DataSourceManager(
             dataSourceConfiguration.initializeIndices,
             dataSourceConfiguration.initializeTables
         )
+    }
+
+    override fun close() {
+        dataSources.values.forEach { it.close() }
     }
 
     fun getDefaultDataSource() = dataSources.getValue(DEFAULT_DATASOURCE)

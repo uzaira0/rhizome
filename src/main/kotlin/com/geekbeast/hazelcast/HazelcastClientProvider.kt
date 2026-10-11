@@ -18,7 +18,7 @@ interface IHazelcastClientProvider {
 data class HazelcastClientProvider(
     private val clients: Map<String, HazelcastConfiguration>,
     private val serializationConfig: SerializationConfig
-) : IHazelcastClientProvider {
+) : IHazelcastClientProvider, AutoCloseable {
     init {
         clients.values.forEach { client ->
             check(!client.isServer) { "Specified server = true for client config: $client" }
@@ -32,6 +32,10 @@ data class HazelcastClientProvider(
                 .setProperty("hazelcast.logging.type", "slf4j")
         cc.clusterName = clientConfig.group
         HazelcastClient.newHazelcastClient(cc)
+    }
+
+    override fun close() {
+        hazelcastClients.values.forEach { it.shutdown() }
     }
 
     override fun getClient(name: String): HazelcastInstance {

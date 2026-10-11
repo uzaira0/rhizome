@@ -25,13 +25,10 @@ import com.codahale.metrics.health.HealthCheckRegistry;
 import com.geekbeast.rhizome.configuration.RhizomeConfiguration;
 import com.geekbeast.rhizome.pods.ConfigurationPod;
 import com.geekbeast.rhizome.pods.MetricsPod;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.inject.Inject;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -42,7 +39,6 @@ import org.springframework.context.annotation.Import;
 @Configuration
 @Import( { ConfigurationPod.class, MetricsPod.class } )
 public class JdbcPod {
-    private static final Logger logger = LoggerFactory.getLogger( JdbcPod.class );
 
     @Inject
     private RhizomeConfiguration rhizomeConfiguration;
@@ -53,21 +49,9 @@ public class JdbcPod {
     @Inject
     private MetricRegistry metricRegistry;
 
-    @Bean
+    @Bean(destroyMethod = "")
     public HikariDataSource hikariDataSource() {
-        if ( rhizomeConfiguration.getPostgresConfiguration().isPresent() ) {
-            final var pgConfig = rhizomeConfiguration.getPostgresConfiguration().get();
-            final var hc = new HikariConfig( pgConfig.getHikariConfiguration() );
-
-            hc.setHealthCheckRegistry( healthCheckRegistry );
-            hc.setMetricRegistry( metricRegistry );
-
-            logger.info( "JDBC URL = {}", hc.getJdbcUrl() );
-
-            return new HikariDataSource( hc );
-        } else {
-            return null;
-        }
+        return dataSourceManager().getDefaultDataSource();
     }
 
     @Bean
