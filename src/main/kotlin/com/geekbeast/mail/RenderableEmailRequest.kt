@@ -41,27 +41,6 @@ class RenderableEmailRequest(
         private const val ATTACHMENTS_FIELD = "attachments"
         private const val ATTACHMENT_PATHS_FIELD = "attachmentPaths"
 
-        @JvmStatic
-        fun fromEmailRequest(
-            subject: String,
-            templatePath: String,
-            templateObjs: Optional<Any>,
-            attachmentPaths: Optional<Array<String>>,
-            byteArrayAttachment: Optional<Array<EmailAttachment<*>>>,
-            request: EmailRequest,
-        ): RenderableEmailRequest {
-            return RenderableEmailRequest(
-                request.from,
-                request.to,
-                request.cc,
-                request.bcc,
-                subject,
-                templatePath,
-                templateObjs,
-                byteArrayAttachment,
-                attachmentPaths
-            )
-        }
     }
 
     override fun equals(other: Any?): Boolean {

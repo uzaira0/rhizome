@@ -10,7 +10,6 @@ import com.geekbeast.rhizome.tests.controllers.SimpleControllerAPI;
 import com.geekbeast.rhizome.tests.pods.DispatcherServletsPod;
 import com.google.common.base.Optional;
 import com.google.common.net.HttpHeaders;
-import com.geekbeast.rhizome.core.Cutting;
 import com.geekbeast.rhizome.core.Rhizome;
 import com.geekbeast.rhizome.pods.ConfigurationLoaderPod;
 import com.geekbeast.rhizome.pods.hazelcast.RegistryBasedHazelcastInstanceConfigurationPod;
@@ -44,12 +43,6 @@ public class RhizomeTests {
     private static Retrofit adapter;
     protected static Rhizome           rhizome  = null;
     private static TestConfiguration expected = null;
-
-    @Test
-    public void getCutting() {
-        Assert.assertNotNull( "Cuttings of the rhizome must always be present.",
-                rhizome.getContext().getBean( Cutting.class ) );
-    }
 
     @Test
     public void testReadWriteConfiguration() {

@@ -17,7 +17,6 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import com.hazelcast.topic.ITopic;
 import com.geekbeast.rhizome.configuration.hazelcast.HazelcastConfigurationContainer;
-import com.geekbeast.rhizome.configuration.hazelcast.HazelcastSessionFilterConfiguration;
 import com.geekbeast.rhizome.configuration.service.ConfigurationService;
 import com.geekbeast.rhizome.configuration.service.RhizomeConfigurationService;
 import java.util.Set;
@@ -28,7 +27,6 @@ import org.springframework.context.annotation.Configuration;
 
 import jakarta.inject.Inject;
 import java.util.Optional;
-import java.util.Properties;
 
 @Configuration
 public class HazelcastPod {
@@ -119,37 +117,6 @@ public class HazelcastPod {
     @Bean
     public ConfigurationService configurationService() {
         return new RhizomeConfigurationService( configTopic(), configurations(), configurationLoader, dendrite );
-    }
-
-    @Bean
-    public Properties hazelcastSessionFilterProperties() {
-        if ( !rhizomeConfiguration.isSessionClusteringEnabled() ) {
-            return null;
-        }
-        HazelcastSessionFilterConfiguration filterConfig = rhizomeConfiguration.getHazelcastSessionFilterConfiguration()
-                .orElse( null );
-        if ( filterConfig == null ) {
-            return null;
-        }
-
-        Properties hsfProps = new Properties();
-        hsfProps.put(
-                HazelcastSessionFilterConfiguration.CLIENT_CONFIG_LOCATION_PROPERTY,
-                filterConfig.getClientConfigLocation() );
-        hsfProps.put(
-                HazelcastSessionFilterConfiguration.COOKIE_HTTP_ONLY_PROPERTY,
-                filterConfig.getClientConfigLocation() );
-        hsfProps.put( HazelcastSessionFilterConfiguration.COOKIE_NAME_PROPERTY, filterConfig.getCookieName() );
-        hsfProps.put( HazelcastSessionFilterConfiguration.MAP_NAME_PROPERTY, filterConfig.getMapName() );
-        hsfProps.put( HazelcastSessionFilterConfiguration.INSTANCE_NAME_PROPERTY, filterConfig.getInstanceName() );
-        hsfProps.put( HazelcastSessionFilterConfiguration.COOKIE_SECURE_PROPERTY, filterConfig.isCookieSecure() );
-        hsfProps.put( HazelcastSessionFilterConfiguration.DEBUG_PROPERTY, filterConfig.isDebug() );
-        hsfProps.put(
-                HazelcastSessionFilterConfiguration.SHUTDOWN_ON_DESTROY_PROPERTY,
-                filterConfig.isShutdownOnDestroy() );
-        hsfProps.put( HazelcastSessionFilterConfiguration.STICKY_SESSION_PROPERTY, filterConfig.isStickySession() );
-        hsfProps.put( HazelcastSessionFilterConfiguration.USE_CLIENT_PROPERTY, filterConfig.useClient() );
-        return hsfProps;
     }
 
     public static enum Topic {

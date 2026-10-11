@@ -6,12 +6,10 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.geekbeast.configuration.postgres.PostgresConfiguration;
-import com.geekbeast.rhizome.configuration.spark.SparkConfiguration;
 import com.google.common.collect.Maps;
 import com.geekbeast.rhizome.configuration.configuration.annotation.ReloadableConfiguration;
 import com.geekbeast.rhizome.configuration.graphite.GraphiteConfiguration;
 import com.geekbeast.rhizome.configuration.hazelcast.HazelcastConfiguration;
-import com.geekbeast.rhizome.configuration.hazelcast.HazelcastSessionFilterConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,19 +22,14 @@ import java.util.Optional;
 @ReloadableConfiguration( uri = "rhizome.yaml" )
 public class RhizomeConfiguration implements Configuration {
     protected static final String PERSISTENCE_ENABLED_PROPERTY                    = "enable-persistence";
-    protected static final String SESSION_CLUSTERING_ENABLED_PROPERTY             = "session-clustering-enabled";
-    protected static final String CORS_ACCESS_CONTROL_ALLOW_ORIGIN_URL            = "cors-access-control-allow-origin-url";
     protected static final String POSTGRES_CONFIGURATION                          = "postgres";
     protected static final String DATASOURCE_CONFIGURATIONS                       = "datasources";
-    protected static final String SPARK_CONFIGURATION_PROPERTY                    = "spark";
     protected static final String GRAPHITE_CONFIGURATION_PROPERTY                 = "graphite";
-    protected static final String HAZELCAST_SESSION_FILTER_CONFIGURATION_PROPERTY = "hazelcast-session-filter";
     protected static final String HAZELCAST_CONFIGURATION_PROPERTY                = "hazelcast";
     protected static final String HAZELCAST_CLIENTS_PROPERTY                      = "hazelcast-clients";
     protected static final String NAME_PROPERTY                                   = "name";
 
     protected static final boolean                                       PERSISTENCE_ENABLED_DEFAULT        = true;
-    protected static final boolean                                       SESSION_CLUSTERING_ENABLED_DEFAULT = false;
     private static final   long                                          serialVersionUID                   = -8444209890618166001L;
     protected static final ConfigurationKey                              key                                = new SimpleConfigurationKey(
             "rhizome.yaml" );
@@ -44,26 +37,18 @@ public class RhizomeConfiguration implements Configuration {
             .getLogger(
                     getClass() );
     protected final        boolean                                       persistData;
-    protected final        boolean                                       sessionClusteringEnabled;
-    protected final        String                                        corsAccessControlAllowOriginUrl;
     protected final        Map<String, PostgresConfiguration>            datasourceConfigurations;
-    protected final        Optional<HazelcastSessionFilterConfiguration> hazelcastSessionFilterConfiguration;
     protected final        Optional<GraphiteConfiguration>               graphiteConfiguration;
     protected final        Optional<PostgresConfiguration>               postgresConfiguration;
 
     protected final Optional<HazelcastConfiguration>              hazelcastConfiguration;
     protected final Optional<Map<String, HazelcastConfiguration>> hazelcastClients;
 
-    protected final Optional<SparkConfiguration> sparkConfiguration;
-
     protected final String name;
 
     @JsonCreator
     public RhizomeConfiguration(
             @JsonProperty( PERSISTENCE_ENABLED_PROPERTY ) Optional<Boolean> persistData,
-            @JsonProperty( SESSION_CLUSTERING_ENABLED_PROPERTY ) Optional<Boolean> sessionClusteringEnabled,
-            @JsonProperty( CORS_ACCESS_CONTROL_ALLOW_ORIGIN_URL )
-                    Optional<String> corsAccessControlAllowOriginUrl,
             @JsonProperty( POSTGRES_CONFIGURATION ) Optional<PostgresConfiguration> postgresConfiguration,
             @JsonProperty( DATASOURCE_CONFIGURATIONS )
                     Optional<Map<String, PostgresConfiguration>> datasourceConfigurations,
@@ -71,22 +56,15 @@ public class RhizomeConfiguration implements Configuration {
                     Optional<GraphiteConfiguration> graphiteConfiguration,
             @JsonProperty( HAZELCAST_CONFIGURATION_PROPERTY )
                     Optional<HazelcastConfiguration> hazelcastConfiguration,
-            @JsonProperty( HAZELCAST_SESSION_FILTER_CONFIGURATION_PROPERTY )
-                    Optional<HazelcastSessionFilterConfiguration> hazelcastSessionFilterConfiguration,
-            @JsonProperty( SPARK_CONFIGURATION_PROPERTY ) Optional<SparkConfiguration> sparkConfig,
             @JsonProperty( NAME_PROPERTY ) Optional<String> name,
             @JsonProperty( HAZELCAST_CLIENTS_PROPERTY )
                     Optional<Map<String, HazelcastConfiguration>> hazelcastClients ) {
         this.persistData = persistData.orElse( PERSISTENCE_ENABLED_DEFAULT );
-        this.sessionClusteringEnabled = sessionClusteringEnabled.orElse( SESSION_CLUSTERING_ENABLED_DEFAULT );
-        this.corsAccessControlAllowOriginUrl = corsAccessControlAllowOriginUrl.orElse( "" );
         this.postgresConfiguration = postgresConfiguration;
         this.datasourceConfigurations = Maps.newHashMap( datasourceConfigurations.orElse( Maps.newHashMap() ) );
         postgresConfiguration.ifPresent( pc -> this.datasourceConfigurations.putIfAbsent( DEFAULT_DATASOURCE, pc ) );
         this.graphiteConfiguration = graphiteConfiguration;
         this.hazelcastConfiguration = hazelcastConfiguration;
-        this.hazelcastSessionFilterConfiguration = hazelcastSessionFilterConfiguration;
-        this.sparkConfiguration = sparkConfig;
         this.hazelcastClients = hazelcastClients;
         this.name = name.orElse( "rhizome" );
     }
@@ -96,34 +74,14 @@ public class RhizomeConfiguration implements Configuration {
         return persistData;
     }
 
-    @JsonProperty( SESSION_CLUSTERING_ENABLED_PROPERTY )
-    public boolean isSessionClusteringEnabled() {
-        return sessionClusteringEnabled;
-    }
-
-    @JsonProperty( CORS_ACCESS_CONTROL_ALLOW_ORIGIN_URL )
-    public String getCORSAccessControlAllowOriginUrl() {
-        return corsAccessControlAllowOriginUrl;
-    }
-
     @JsonProperty( GRAPHITE_CONFIGURATION_PROPERTY )
     public Optional<GraphiteConfiguration> getGraphiteConfiguration() {
         return graphiteConfiguration;
     }
 
-    @JsonProperty( HAZELCAST_SESSION_FILTER_CONFIGURATION_PROPERTY )
-    public Optional<HazelcastSessionFilterConfiguration> getHazelcastSessionFilterConfiguration() {
-        return hazelcastSessionFilterConfiguration;
-    }
-
     @JsonProperty( HAZELCAST_CONFIGURATION_PROPERTY )
     public Optional<HazelcastConfiguration> getHazelcastConfiguration() {
         return hazelcastConfiguration;
-    }
-
-    @JsonProperty( SPARK_CONFIGURATION_PROPERTY )
-    public Optional<SparkConfiguration> getSparkConfiguration() {
-        return sparkConfiguration;
     }
 
     @JsonProperty( DATASOURCE_CONFIGURATIONS )
@@ -149,13 +107,9 @@ public class RhizomeConfiguration implements Configuration {
     @Override public String toString() {
         return "RhizomeConfiguration{" +
                 "persistData=" + persistData +
-                ", sessionClusteringEnabled=" + sessionClusteringEnabled +
-                ", corsAccessControlAllowOriginUrl='" + corsAccessControlAllowOriginUrl + '\'' +
-                ", hazelcastSessionFilterConfiguration=" + hazelcastSessionFilterConfiguration +
                 ", graphiteConfiguration=" + graphiteConfiguration +
                 ", postgresConfiguration=" + postgresConfiguration +
                 ", hazelcastConfiguration=" + hazelcastConfiguration +
-                ", sparkConfiguration=" + sparkConfiguration +
                 ", name='" + name + '\'' +
                 '}';
     }

@@ -44,7 +44,6 @@ public class AuthenticationTest {
             "test-client-id",
             secret,
             ImmutableSet.of( authConfiguration ),
-            Optional.empty(),
             "localhost" );
 
     private static final Algorithm algorithm = Algorithm.HMAC256( secret );
