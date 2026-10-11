@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author Matthew Tamayo-Rios
@@ -40,7 +39,7 @@ public class ConnectorConfiguration {
     protected       int              httpsPort;
 
     /*
-     * Pass in 0 for port numbers to automatically generate random ports for unit testing / integration testing.
+     * Pass in 0 for an OS-assigned free port when Jetty binds the connector.
      */
 
     @JsonCreator
@@ -57,20 +56,8 @@ public class ConnectorConfiguration {
             @JsonProperty( NEED_CLIENT_AUTH_PROPERTY ) Optional<Boolean> needClientAuth,
             @JsonProperty( WANT_CLIENT_AUTH_PROPERTY ) Optional<Boolean> wantClientAuth,
             @JsonProperty( CERTIFICATE_ALIAS_PROPERTY ) Optional<String> certificateAlias ) {
-        // Non-cryptographic jitter to pick free ports for unit / integration testing.
-        final ThreadLocalRandom r = ThreadLocalRandom.current();
-
-        if ( httpPort.isPresent() && httpPort.get() == 0 ) {
-            this.httpPort = HTTP_PORT_DEFAULT + r.nextInt( 50 );
-        } else {
-            this.httpPort = httpPort.orElse( HTTP_PORT_DEFAULT );
-        }
-
-        if ( httpsPort.isPresent() && httpsPort.get() == 0 ) {
-            this.httpsPort = SSL_PORT_DEFAULT + r.nextInt( 50 );
-        } else {
-            this.httpsPort = httpsPort.orElse( SSL_PORT_DEFAULT );
-        }
+        this.httpPort = httpPort.orElse( HTTP_PORT_DEFAULT );
+        this.httpsPort = httpsPort.orElse( SSL_PORT_DEFAULT );
 
         this.http2Enabled = http2Enabled.orElse( HTTP2_ENABLED_DEFAULT );
         this.useSSL = useSSL.orElse( USE_SSL_DEFAULT );

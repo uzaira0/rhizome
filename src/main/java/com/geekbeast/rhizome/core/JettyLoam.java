@@ -9,6 +9,8 @@ import com.geekbeast.rhizome.configuration.service.ConfigurationService;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import com.google.common.io.Resources;
@@ -46,6 +48,8 @@ public class JettyLoam implements Loam {
     private static final Logger logger = LoggerFactory.getLogger(JettyLoam.class);
     protected final JettyConfiguration config;
     private final Server server;
+    // Port 0 binds an OS-assigned port; these copy the bound port back into the configuration after start.
+    private final List<Runnable> boundPortPublishers = new ArrayList<>();
 
     protected JettyLoam() throws IOException {
         this(ConfigurationService.StaticLoader.loadConfiguration(JettyConfiguration.class));
@@ -178,6 +182,9 @@ public class JettyLoam implements Loam {
             http.setIdleTimeout( hardening.getIdleTimeout() );
 
             server.addConnector( http );
+            if ( http.getPort() == 0 ) {
+                boundPortPublishers.add( () -> configuration.setHttpPort( http.getLocalPort() ) );
+            }
         }
 
         if ((configuration.requireSSL() || configuration.useSSL())
@@ -244,6 +251,14 @@ public class JettyLoam implements Loam {
             ssl.setIdleTimeout( hardening.getIdleTimeout() );
 
             server.addConnector( ssl );
+            if ( ssl.getPort() == 0 ) {
+                boundPortPublishers.add( () -> {
+                    int httpsPort = ssl.getLocalPort();
+                    configuration.setHttpsPort( httpsPort );
+                    http_config.setSecurePort( httpsPort );
+                    https_config.setSecurePort( httpsPort );
+                } );
+            }
         } else if ( configuration.requireSSL()
                 && ( !config.getTruststoreConfiguration().isPresent()
                 || !config.getKeystoreConfiguration().isPresent() ) ) {
@@ -283,6 +298,7 @@ public class JettyLoam implements Loam {
     public synchronized void start() throws Exception {
         if (!server.isRunning()) {
             server.start();
+            boundPortPublishers.forEach( Runnable::run );
         }
     }
 
