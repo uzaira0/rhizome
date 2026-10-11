@@ -26,7 +26,7 @@ import com.google.common.eventbus.EventBus;
 import com.google.common.io.Resources;
 // hazelcast-wm removed (jakarta.servlet only, session clustering unused with JWT auth)
 import io.prometheus.client.CollectorRegistry;
-import org.eclipse.jetty.ee10.servlet.DefaultServlet;
+import org.eclipse.jetty.ee11.servlet.DefaultServlet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.AbstractApplicationContext;

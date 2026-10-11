@@ -7,16 +7,12 @@ import com.geekbeast.rhizome.configuration.jetty.ContextConfiguration;
 import com.geekbeast.rhizome.configuration.jetty.JettyConfiguration;
 import com.geekbeast.rhizome.configuration.service.ConfigurationService;
 import java.io.IOException;
-import java.util.Collection;
 import jakarta.inject.Inject;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -82,9 +78,6 @@ public class SimpleController implements SimpleControllerAPI {
             method = RequestMethod.GET,
             produces = MediaType.APPLICATION_JSON_VALUE )
     public @ResponseBody TestConfiguration getTestConfigurationSecuredAdmin() {
-        Collection<? extends GrantedAuthority> authorities = SecurityContextHolder.getContext().getAuthentication()
-                .getAuthorities();
-        logger.debug( "Granted authorities:  {}", authorities );
         try {
             return configurationService.getConfiguration( TestConfiguration.class );
         } catch ( Exception e ) {
@@ -99,9 +92,6 @@ public class SimpleController implements SimpleControllerAPI {
             method = RequestMethod.GET,
             produces = MediaType.APPLICATION_JSON_VALUE )
     public @ResponseBody TestConfiguration getTestConfigurationSecuredFoo() {
-        Collection<? extends GrantedAuthority> authorities = SecurityContextHolder.getContext().getAuthentication()
-                .getAuthorities();
-        logger.debug( "Granted authorities:  {}", authorities );
         try {
             return configurationService.getConfiguration( TestConfiguration.class );
         } catch ( Exception e ) {
@@ -170,7 +160,7 @@ public class SimpleController implements SimpleControllerAPI {
             produces = MediaType.TEXT_PLAIN_VALUE )
     public ResponseEntity<String> teapot( HttpServletResponse response ) {
         teapot();
-        return new ResponseEntity<>( "I AM A TEAPOT!", HttpStatus.I_AM_A_TEAPOT );
+        return ResponseEntity.status( TEAPOT_STATUS ).body( "I AM A TEAPOT!" );
     }
 
     @Override

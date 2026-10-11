@@ -27,7 +27,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 
-import org.eclipse.jetty.ee10.webapp.WebAppContext;
+import org.eclipse.jetty.ee11.webapp.WebAppContext;
 
 import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
@@ -98,7 +98,7 @@ public class JettyLoam implements Loam {
             }
             context.setParentLoaderPriority(contextConfig.isParentLoaderPriority());
         } else {
-            // Jetty EE10 requires a baseResource to be set
+            // Jetty EE11 requires a baseResource to be set
             context.setBaseResource(ResourceFactory.of(context).newClassPathResource("/"));
         }
 
@@ -151,6 +151,8 @@ public class JettyLoam implements Loam {
         // Security hardening: limit request/response header sizes to prevent header bomb attacks
         http_config.setRequestHeaderSize( hardening.getRequestHeaderSize() );
         http_config.setResponseHeaderSize( hardening.getResponseHeaderSize() );
+        // Preserve Jetty 12.0's responseHeaderSize ceiling for HTTP/1.1 and HTTP/2.
+        http_config.setMaxResponseHeaderSize( -1 );
 
         // Security hardening: set output buffer size
         http_config.setOutputBufferSize( hardening.getOutputBufferSize() );

@@ -134,7 +134,7 @@ public class RhizomeTests {
                 } )
                 .addInterceptor( chain -> {
                     Response response = chain.proceed( chain.request() );
-                    if ( response.code() == HttpStatus.I_AM_A_TEAPOT.value() ) {
+                    if ( response.code() == SimpleControllerAPI.TEAPOT_STATUS ) {
                         Assert.assertTrue( StringUtils.startsWith( response.body().contentType().toString(),
                                 MediaType.TEXT_PLAIN_VALUE ) );
                         return response.newBuilder().code( 200 ).build();

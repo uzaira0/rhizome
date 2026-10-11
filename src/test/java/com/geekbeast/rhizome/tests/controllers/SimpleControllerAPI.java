@@ -11,6 +11,7 @@ import retrofit2.http.PUT;
 
 public interface SimpleControllerAPI {
     String CONTROLLER = "/";
+    int TEAPOT_STATUS = 418;
 
     interface ENDPOINTS {
         String GZIP_TEST                  = "unsecured/gzip";
