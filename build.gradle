@@ -105,12 +105,9 @@ dokkaHtml {
 test {
     ignoreFailures = false
     // These integration tests each bootstrap a full Rhizome: a singleton Hazelcast
-    // instance ("test"), an embedded Jetty on a fixed port (8081), and a JVM-global
-    // SSL socket factory for GreenMail. Sharing one JVM across test classes caused
-    // HazelcastInstanceNotActiveException (one class's teardown deactivates the
-    // shared instance), port 8081 BindException, and GreenMail SSL-provider
-    // pollution ("bad greeting" on the SMTPS port). Fork a fresh JVM per class,
-    // run serially, so each class gets pristine global state.
+    // instance ("test") and an embedded Jetty on a fixed port (8081). In a shared JVM one
+    // class's teardown deactivates the instance and the next class cannot bind 8081, so
+    // each class runs serially in a fresh JVM.
     forkEvery = 1
     maxParallelForks = 1
 }
@@ -266,15 +263,6 @@ dependencies {
     implementation "io.netty:netty-transport-native-epoll:${netty_epoll_version}:${netty_os_arch}"
 
     /*
-     * JAVAMAIL
-     * Java email client.
-     */
-    api "org.jodd:jodd-mail:${jodd_mail_version}"
-    api "jakarta.mail:jakarta.mail-api:${jakarta_mail_api}"
-    implementation "org.eclipse.angus:angus-mail:${angus_mail_version}"
-    api "com.samskivert:jmustache:1.15"
-
-    /*
      * Cassandra (removed: Cassandra is not used, snappy/lz4 not imported anywhere)
      */
     // implementation "org.xerial.snappy:snappy-java:${snappy_version}"
@@ -290,7 +278,6 @@ dependencies {
     api "jakarta.annotation:jakarta.annotation-api:${jakarta_annotation_version}"
     api "jakarta.validation:jakarta.validation-api:${jakarta_validation_api_version}"
 
-    implementation fileTree(dir: "lib/", include: "*.jar")
 
 
     api "com.squareup.retrofit2:retrofit:${retrofit2_version}"
