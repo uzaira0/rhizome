@@ -26,12 +26,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 
 /**
- * Resolves bearer tokens from the Authorization header, an httpOnly cookie, or a legacy
- * authorization cookie. Priority order:
+ * Resolves bearer tokens from the Authorization header or the httpOnly auth cookie. Priority order:
  * <ol>
  *   <li>Authorization header (for API clients, mobile, API keys)</li>
- *   <li>httpOnly "chronicle_auth" cookie (F-P0-2: secure browser auth)</li>
- *   <li>Legacy "authorization" cookie with Bearer prefix</li>
+ *   <li>httpOnly "chronicle_auth" cookie (browser auth)</li>
  * </ol>
  *
  * Cookie-based auth requires CSRF validation via X-CSRF-Token header.
@@ -43,7 +41,6 @@ public class CookieOrBearerTokenResolver implements BearerTokenResolver {
     private static final Logger logger = LoggerFactory.getLogger( CookieOrBearerTokenResolver.class );
 
     private static final String AUTHORIZATION_HEADER  = "Authorization";
-    private static final String AUTHORIZATION_COOKIE  = AUTHORIZATION_HEADER.toLowerCase();
     private static final String BEARER_PREFIX         = "Bearer";
     private static final String HTTPONLY_AUTH_COOKIE   = "chronicle_auth";
     private static final String CSRF_COOKIE           = "ol_csrf_token";
@@ -59,7 +56,7 @@ public class CookieOrBearerTokenResolver implements BearerTokenResolver {
             return parts.length == 2 ? parts[ 1 ] : null;
         }
 
-        // 2. httpOnly "chronicle_auth" cookie (F-P0-2: browser auth via httpOnly cookie)
+        // 2. httpOnly "chronicle_auth" cookie (browser auth)
         final String httpOnlyToken = getRequestCookie( request, HTTPONLY_AUTH_COOKIE );
         if ( httpOnlyToken != null && !httpOnlyToken.isEmpty() ) {
             if ( validateCsrf( request ) ) {
@@ -67,16 +64,6 @@ public class CookieOrBearerTokenResolver implements BearerTokenResolver {
             }
             logger.debug( "CSRF validation failed for httpOnly cookie auth" );
             return null;
-        }
-
-        // 3. Legacy: "authorization" cookie with "Bearer <token>" value
-        final String legacyCookie = getRequestCookie( request, AUTHORIZATION_COOKIE );
-        if ( legacyCookie != null && legacyCookie.startsWith( BEARER_PREFIX ) ) {
-            if ( validateCsrf( request ) ) {
-                final String[] parts = legacyCookie.split( " " );
-                return parts.length == 2 ? parts[ 1 ] : null;
-            }
-            logger.debug( "CSRF validation failed for legacy cookie auth" );
         }
 
         return null;
