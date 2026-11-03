@@ -21,6 +21,7 @@
 package com.geekbeast.postgres.mapstores;
 
 import com.codahale.metrics.annotation.Timed;
+import com.geekbeast.jdbc.SqlFailures;
 import com.geekbeast.postgres.PostgresTableDefinition;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
@@ -59,10 +60,10 @@ public abstract class AbstractBasePostgresMapstore<K, V> extends AbstractPostgre
             insertRow.execute();
             handleStoreSucceeded( key, value );
         } catch ( SQLException e ) {
-            String errMsg = "Error executing SQL during store for key " + key + " in map " + mapName + ".";
-            logger.error( errMsg, e );
+            var failure = SqlFailures.sanitize(e);
+            logger.error("Error executing SQL during store in map {}.", mapName, failure);
             handleStoreFailed( key, value );
-            throw new IllegalStateException( errMsg, e );
+            throw failure;
         }
 
     }
@@ -70,20 +71,18 @@ public abstract class AbstractBasePostgresMapstore<K, V> extends AbstractPostgre
     @Timed
     @Override
     public void storeAll( Map<K, V> map ) {
-        K key = null;
         try ( Connection connection = hds.getConnection(); PreparedStatement insertRow = prepareInsert( connection ) ) {
             //TODO: We might want to do an inner try catch here to get specific logging on what failed
             for ( Entry<K, V> entry : map.entrySet() ) {
-                key = entry.getKey();
-                bind( insertRow, key, entry.getValue() );
+                bind( insertRow, entry.getKey(), entry.getValue() );
                 insertRow.addBatch();
             }
             insertRow.executeBatch();
             handleStoreAllSucceeded( map );
         } catch ( SQLException e ) {
-            String errMsg = "Error executing SQL during store all for key " + key + " in map " + mapName + ".";
-            logger.error( errMsg, e );
-            throw new IllegalStateException( errMsg, e );
+            var failure = SqlFailures.sanitize(e);
+            logger.error("Error executing SQL during store all in map {}.", mapName, failure);
+            throw failure;
         }
     }
 

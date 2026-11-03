@@ -23,6 +23,7 @@ package com.geekbeast.postgres.mapstores;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.codahale.metrics.annotation.Timed;
+import com.geekbeast.jdbc.SqlFailures;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -154,34 +155,30 @@ public abstract class AbstractPostgresMapstore2<K, V> implements TestableSelfReg
             bind( deleteRow, key );
             deleteRow.executeUpdate();
         } catch ( SQLException e ) {
-            String errMsg = "Error executing SQL during delete for key " + key + " in map " + mapName + ".";
-            logger.error( errMsg, e );
-            throw new IllegalStateException( errMsg, e );
+            var failure = SqlFailures.sanitize(e);
+            logger.error("Error executing SQL during delete in map {}.", mapName, failure);
+            throw failure;
         }
     }
 
     @Timed
     @Override
     public void deleteAll( Collection<K> keys ) {
-        K key = null;
         try ( Connection connection = hds.getConnection(); PreparedStatement deleteRow = prepareDelete( connection ) ) {
             for ( K k : keys ) {
-                key = k;
-                bind( deleteRow, key );
+                bind( deleteRow, k );
                 deleteRow.addBatch();
             }
             deleteRow.executeBatch();
         } catch ( SQLException e ) {
-            String errMsg = "Error executing SQL during delete all for key " + key + " in map " + mapName + ".";
-            logger.error( errMsg, e );
-            throw new IllegalStateException( errMsg, e );
+            var failure = SqlFailures.sanitize(e);
+            logger.error("Error executing SQL during delete all in map {}.", mapName, failure);
+            throw failure;
         }
     }
 
     protected V readNext( ResultSet rs ) throws SQLException {
-        V val = mapToValue( rs );
-        logger.debug( "LOADED value {} in map {}", val, mapName );
-        return val;
+        return mapToValue( rs );
     }
 
     protected V loadUsing( K key, Connection connection ) {
@@ -192,14 +189,14 @@ public abstract class AbstractPostgresMapstore2<K, V> implements TestableSelfReg
                     return readNext( rs );
                 }
             } catch ( SQLException e ) {
-                final String errMsg = "Error executing SQL during select for key " + key + ".";
-                logger.error( errMsg, e );
-                throw new IllegalStateException( errMsg, e );
+                var failure = SqlFailures.sanitize(e);
+                logger.error("Error executing SQL during select in map {}.", mapName, failure);
+                throw failure;
             }
         } catch ( SQLException e ) {
-            final String errMsg = "Error binding to select for key " + key + " in map " + mapName + ".";
-            logger.error( errMsg, key, e );
-            throw new IllegalArgumentException( errMsg, e );
+            var failure = SqlFailures.sanitize(e);
+            logger.error("Error binding to select in map {}.", mapName, failure);
+            throw failure;
         }
         return null;
     }
@@ -210,10 +207,9 @@ public abstract class AbstractPostgresMapstore2<K, V> implements TestableSelfReg
         try ( Connection connection = hds.getConnection() ) {
             return loadUsing( key, connection );
         } catch ( SQLException e ) {
-            final String errMsg = "Unable to connect to database to load key " + key.toString() +
-                    " map +" + mapName + "!";
-            logger.error( errMsg, key, e );
-            throw new IllegalStateException( errMsg, e );
+            var failure = SqlFailures.sanitize(e);
+            logger.error("Unable to connect to database for map {}.", mapName, failure);
+            throw failure;
         }
     }
 
@@ -222,11 +218,9 @@ public abstract class AbstractPostgresMapstore2<K, V> implements TestableSelfReg
     public Map<K, V> loadAll( Collection<K> keys ) {
         Map<K, V> result = Maps.newLinkedHashMapWithExpectedSize(keys.size());
 
-        K key = null;
         try ( Connection connection = hds.getConnection();
                                 PreparedStatement selectWhere = prepareSelectByKey( connection ) ) {
                 for(var k : keys ) {
-                    key = k;
                     bind(selectWhere, k,1);
                     try ( ResultSet rs = selectWhere.executeQuery() ) {
                         if(rs.next()) {
@@ -235,9 +229,9 @@ public abstract class AbstractPostgresMapstore2<K, V> implements TestableSelfReg
                     }
                 }
         } catch ( SQLException e ) {
-            String errMsg = "Error executing SQL during select for key " + key + " in map " + mapName + ".";
-            logger.error( errMsg, e );
-            throw new IllegalStateException( errMsg, e );
+            var failure = SqlFailures.sanitize(e);
+            logger.error("Error executing SQL during select all in map {}.", mapName, failure);
+            throw failure;
         }
         return result;
     }
@@ -250,8 +244,9 @@ public abstract class AbstractPostgresMapstore2<K, V> implements TestableSelfReg
                     try {
                         return mapToKey( rs );
                     } catch ( SQLException e ) {
-                        logger.error( "Unable to read keys for map {}.", mapName, e);
-                        throw new IllegalStateException( "Unable to read keys.", e );
+                        var failure = SqlFailures.sanitize(e);
+                        logger.error("Unable to read keys for map {}.", mapName, failure);
+                        throw failure;
                     }
                 }
         );

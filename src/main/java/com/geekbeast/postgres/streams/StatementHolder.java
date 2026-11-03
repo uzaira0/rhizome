@@ -115,7 +115,7 @@ public class StatementHolder implements Closeable {
         try {
             obj.close();
         } catch ( Exception e ) {
-            logger.error( "Unable to close {}", obj.getClass().getSimpleName(), e );
+            logger.error("Unable to close {} category={}", obj.getClass().getSimpleName(), e.getClass().getSimpleName());
         }
     }
 

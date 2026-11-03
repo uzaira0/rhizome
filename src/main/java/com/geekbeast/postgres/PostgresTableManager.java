@@ -20,6 +20,8 @@
 
 package com.geekbeast.postgres;
 
+import com.geekbeast.jdbc.SqlFailures;
+
 import com.geekbeast.postgres.CitusDistributedTableDefinition;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
@@ -92,9 +94,8 @@ public class PostgresTableManager {
                                             && ddex.getMessage().contains( ALREADY_DISTRIBUTED_ERROR_MSG ) ) {
                                         logger.info( "Table {} is already distributed.", table.getName() );
                                     } else {
-                                        logger.warn( "Unable to distribute table {}. Cause: {}",
-                                                table.getName(),
-                                                ddex.getMessage());
+                                        logger.warn("Unable to distribute table {} category={} SQLState={}",
+                                                table.getName(), ddex.getClass().getSimpleName(), ddex.getSQLState());
                                     }
                                 }
                             }
@@ -107,20 +108,16 @@ public class PostgresTableManager {
                             try ( Statement sci = conn.createStatement() ) {
                                 sci.execute( indexSql );
                             } catch ( SQLException e ) {
-                                logger.info( "Failed to create index {} with query {} for table {}",
-                                        index,
-                                        indexSql,
-                                        table );
-                                throw e;
+                                var failure = SqlFailures.sanitize(e);
+                                logger.info("Failed to create index for table {}", table.getName(), failure);
+                                throw failure;
                             }
                         }
                     }
                 } catch ( SQLException e ) {
-                    logger.info( "Failed to initialize postgres table {} with query {}",
-                            table,
-                            table.createTableQuery(),
-                            e );
-                    throw e;
+                    var failure = SqlFailures.sanitize(e);
+                    logger.info("Failed to initialize postgres table {}", table.getName(), failure);
+                    throw failure;
                 }
 
             }

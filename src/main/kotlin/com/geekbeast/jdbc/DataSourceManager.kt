@@ -8,7 +8,8 @@ import com.geekbeast.postgres.PostgresTableManager
 import com.geekbeast.postgres.PostgresTables
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import org.slf4j.LoggerFactory
+import org.postgresql.Driver
+import org.postgresql.PGProperty
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import kotlin.streams.asSequence
@@ -25,7 +26,6 @@ class DataSourceManager(
 ) : AutoCloseable {
 
     companion object {
-        private val logger = LoggerFactory.getLogger(DataSourceManager::class.java)
         const val DEFAULT_DATASOURCE = "default"
     }
 
@@ -33,10 +33,14 @@ class DataSourceManager(
 
         val hc = HikariConfig(postgresConfiguration.hikariConfiguration)
 
+        val detailsRequested = hc.jdbcUrl?.let { Driver.parseURL(it, null) }
+            ?.getProperty(PGProperty.LOG_SERVER_ERROR_DETAIL.getName())?.equals("true", ignoreCase = true)
+        require(detailsRequested != true) {
+            "PostgreSQL server error details must remain disabled"
+        }
+        hc.addDataSourceProperty(PGProperty.LOG_SERVER_ERROR_DETAIL.getName(), "false")
         hc.healthCheckRegistry = healthCheckRegistry
         hc.metricRegistry = metricRegistry
-
-        logger.info("JDBC URL = {}", hc.jdbcUrl)
 
         return@mapValues HikariDataSource(hc)
     }

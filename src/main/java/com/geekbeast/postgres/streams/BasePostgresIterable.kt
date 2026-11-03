@@ -1,6 +1,7 @@
 package com.geekbeast.postgres.streams
 
 import com.geekbeast.streams.StreamUtil
+import com.geekbeast.jdbc.SqlFailures
 import com.google.common.base.Preconditions.checkState
 import com.zaxxer.hikari.HikariDataSource
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings
@@ -37,7 +38,7 @@ class BasePostgresIterable<T>(
             return PostgresIterator(rsh.get(), mapper)
         } catch (e: SQLException) {
             logger.error("Error creating postgres stream iterator.")
-            throw IllegalStateException("Unable to instantiate postgres iterator.", e)
+            throw SqlFailures.sanitize(e)
         } catch (e: IOException) {
             logger.error("Error creating postgres stream iterator.")
             throw IllegalStateException("Unable to instantiate postgres iterator.", e)
@@ -175,7 +176,7 @@ class PostgresIterator<T> @Throws(SQLException::class)
             this.rs.next()
         } catch (e: SQLException) {
             rsh.close()
-            throw e
+            throw SqlFailures.sanitize(e)
         }
         updateExpiration()
 
@@ -230,7 +231,7 @@ class PostgresIterator<T> @Throws(SQLException::class)
             nextElem = mapper(rs)
             notExhausted = rs.next()
         } catch (e: SQLException) {
-            logger.error("Unable to retrieve next element from result set.", e)
+            logger.error("Unable to retrieve next element from result set.", SqlFailures.sanitize(e))
             notExhausted = false
             throw NoSuchElementException("Unable to retrieve next element from result set.")
         } catch (e: Exception) {
