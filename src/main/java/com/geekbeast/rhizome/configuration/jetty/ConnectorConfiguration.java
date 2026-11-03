@@ -13,6 +13,7 @@ import java.util.Optional;
         ignoreUnknown = false )
 public class ConnectorConfiguration {
     protected static final String HTTP_PORT_PROPERTY         = "http-port";
+    protected static final String HTTP_HOST_PROPERTY         = "http-host";
     protected static final String HTTPS_PORT_PROPERTY        = "https-port";
     protected static final String USE_SSL_PROPERTY           = "use-ssl";
     protected static final String REQUIRE_SSL_PROPERTY       = "require-ssl";
@@ -35,6 +36,7 @@ public class ConnectorConfiguration {
     protected final boolean          requireSSL;
     protected final Optional<String> certificateAlias;
     protected final boolean          http2Enabled;
+    protected final Optional<String> httpHost;
     protected       int              httpPort;
     protected       int              httpsPort;
 
@@ -50,6 +52,7 @@ public class ConnectorConfiguration {
             @JsonProperty(
                     value = HTTPS_PORT_PROPERTY,
                     required = true ) Optional<Integer> httpsPort,
+            @JsonProperty( HTTP_HOST_PROPERTY ) Optional<String> httpHost,
             @JsonProperty( HTTP2_ENABLED_PROPERTY ) Optional<Boolean> http2Enabled,
             @JsonProperty( USE_SSL_PROPERTY ) Optional<Boolean> useSSL,
             @JsonProperty( REQUIRE_SSL_PROPERTY ) Optional<Boolean> requireSSL,
@@ -58,6 +61,7 @@ public class ConnectorConfiguration {
             @JsonProperty( CERTIFICATE_ALIAS_PROPERTY ) Optional<String> certificateAlias ) {
         this.httpPort = httpPort.orElse( HTTP_PORT_DEFAULT );
         this.httpsPort = httpsPort.orElse( SSL_PORT_DEFAULT );
+        this.httpHost = httpHost;
 
         this.http2Enabled = http2Enabled.orElse( HTTP2_ENABLED_DEFAULT );
         this.useSSL = useSSL.orElse( USE_SSL_DEFAULT );
@@ -75,6 +79,12 @@ public class ConnectorConfiguration {
     @JsonProperty( HTTP_PORT_PROPERTY )
     public int getHttpPort() {
         return httpPort;
+    }
+
+    /** Interface the plain HTTP connector binds; absent binds every interface. */
+    @JsonProperty( HTTP_HOST_PROPERTY )
+    public Optional<String> getHttpHost() {
+        return httpHost;
     }
 
     public void setHttpPort( int httpPort ) {

@@ -177,6 +177,7 @@ public class JettyLoam implements Loam {
                     : new ServerConnector(server, httpConnectionFactory);
 
             http.setPort( configuration.getHttpPort() );
+            configuration.getHttpHost().ifPresent( http::setHost );
 
             // Security hardening: set idle timeout on connector to prevent Slow Loris attacks
             http.setIdleTimeout( hardening.getIdleTimeout() );

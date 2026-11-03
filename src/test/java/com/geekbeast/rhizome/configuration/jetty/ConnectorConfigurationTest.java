@@ -45,8 +45,29 @@ public class ConnectorConfigurationTest {
         }
     }
 
+    @Test
+    public void httpHostBindsThePlainConnectorToThatInterfaceOnly() throws Exception {
+        ConnectorConfiguration web = new ConnectorConfiguration( Optional.of( 0 ), Optional.of( 0 ),
+                Optional.of( "127.0.0.1" ), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty() );
+        JettyLoam loam = new JettyLoam( new JettyConfiguration(
+                Optional.of( web ), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty() ) );
+        loam.getServer().setHandler( new DefaultHandler() );
+        try {
+            loam.start();
+            ServerConnector http = (ServerConnector) loam.getServer().getConnectors()[0];
+            assertEquals( "127.0.0.1", http.getHost() );
+            assertEquals( "127.0.0.1", web.getHttpHost().orElseThrow() );
+        } finally {
+            loam.getServer().stop();
+        }
+        assertTrue( connectorConfiguration( Optional.of( 0 ) ).getHttpHost().isEmpty() );
+    }
+
     private static ConnectorConfiguration connectorConfiguration( Optional<Integer> port ) {
         return new ConnectorConfiguration( port, port, Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty() );
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty() );
     }
 }
