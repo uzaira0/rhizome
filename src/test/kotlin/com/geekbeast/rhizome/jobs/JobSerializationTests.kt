@@ -21,9 +21,16 @@
 
 package com.geekbeast.rhizome.jobs
 
+import com.fasterxml.jackson.databind.exc.InvalidTypeIdException
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.module.kotlin.readValue
+import com.geekbeast.mappers.mappers.ObjectMappers
 import com.geekbeast.serializer.serializer.AbstractJacksonSerializationTest
 import org.apache.commons.lang3.RandomStringUtils
 import org.apache.commons.lang3.RandomUtils
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Test
 import java.util.*
 
 /**
@@ -43,5 +50,24 @@ internal class JobSerializationTests : AbstractJacksonSerializationTest<EmptyJob
     }
 
     override fun getClazz(): Class<EmptyJob> = EmptyJob::class.java
+
+    /** Stored jobs keep their class names in "@class"; a name outside the listed jobs is refused. */
+    @Test fun storedJobsReadBackOnlyAsListedTypes() {
+        val mapper = ObjectMappers.getJsonMapper()
+        val written = mapper.readTree(mapper.writeValueAsString(getSampleData()))
+        assertEquals(EmptyJob::class.java.name, written["@class"].asText())
+        assertEquals(EmptyJobState::class.java.name, written["state"]["@class"].asText())
+        val readBack = mapper.treeToValue(written, AbstractDistributedJob::class.java)
+        assertEquals(written, mapper.readTree(mapper.writeValueAsString(readBack)))
+
+        val unlisted = written.deepCopy<ObjectNode>().put("@class", UnlistedJob::class.java.name)
+        assertThrows(InvalidTypeIdException::class.java) {
+            mapper.readValue<AbstractDistributedJob<*, *>>(mapper.writeValueAsString(unlisted))
+        }
+    }
+
+    private class UnlistedJob(state: EmptyJobState) : AbstractDistributedJob<Long, EmptyJobState>(state) {
+        override fun processNextBatch() = Unit
+    }
 }
 

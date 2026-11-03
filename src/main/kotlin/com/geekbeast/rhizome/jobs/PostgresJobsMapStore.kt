@@ -61,7 +61,8 @@ class PostgresJobsMapStore @JvmOverloads constructor(
     override fun mapToKey(rs: ResultSet): UUID = rs.getObject(ID_FIELD, UUID::class.java)
 
     @Timed
-    override fun mapToValue(rs: ResultSet): DistributableJob<*> = mapper.readValue(rs.getString(JOB_FIELD))
+    override fun mapToValue(rs: ResultSet): DistributableJob<*> =
+            mapper.readValue<AbstractDistributedJob<*, *>>(rs.getString(JOB_FIELD))
 
     override fun bind(ps: PreparedStatement, key: UUID, value: DistributableJob<*>?) {
         val json = mapper.writeValueAsString(value)

@@ -2,6 +2,7 @@ package com.geekbeast.rhizome.hazelcast.serializers
 
 import com.geekbeast.mappers.mappers.ObjectMappers
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.geekbeast.rhizome.jobs.AbstractDistributedJob
 import com.geekbeast.rhizome.jobs.DistributableJob
 import com.hazelcast.nio.ObjectDataInput
 import com.hazelcast.nio.ObjectDataOutput
@@ -22,6 +23,7 @@ class EmptyJobStreamSerializer : SelfRegisteringStreamSerializer<DistributableJo
         out.writeByteArray(mapper.writeValueAsBytes(`object`))
     }
 
-    override fun read(`in`: ObjectDataInput): DistributableJob<*> = mapper.readValue(`in`.readByteArray()!!)
+    override fun read(`in`: ObjectDataInput): DistributableJob<*> =
+        mapper.readValue<AbstractDistributedJob<*, *>>(`in`.readByteArray()!!)
     override fun getClazz(): Class<out DistributableJob<*>> = DistributableJob::class.java
 }

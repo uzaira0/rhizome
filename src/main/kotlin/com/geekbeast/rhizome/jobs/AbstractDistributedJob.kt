@@ -21,6 +21,8 @@
 
 package com.geekbeast.rhizome.jobs
 
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.core.HazelcastInstanceAware
 import com.hazelcast.map.IMap
@@ -40,9 +42,12 @@ const val INITIALIZE_TASK_ID_POLLING_MILLIS = 500L
  *
  * @param state The state of the job that can be retrieved by any hazelcast client.
  *
+ * Stored and distributed jobs name their class in "@class"; only the listed jobs are accepted.
+ *
  * @author Matthew Tamayo-Rios &lt;matthew@openlattice.com&gt;
  */
-
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "@class")
+@JsonSubTypes(JsonSubTypes.Type(value = EmptyJob::class, name = "com.geekbeast.rhizome.jobs.EmptyJob"))
 abstract class AbstractDistributedJob<R, S : JobState>(
         state: S,
         val maxBatchDuration: Long = 1,

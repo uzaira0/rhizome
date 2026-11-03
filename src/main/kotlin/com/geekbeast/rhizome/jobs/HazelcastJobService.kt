@@ -23,6 +23,7 @@ package com.geekbeast.rhizome.jobs
 
 import com.codahale.metrics.annotation.Timed
 import com.geekbeast.mappers.mappers.ObjectMappers
+import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -218,7 +219,9 @@ class HazelcastJobService(hazelcastInstance: HazelcastInstance) {
 private const val JOB_NOT_DESERIAZBLE_ERROR = "Submitted job could not be properly deserialized."
 private const val JOB_NOT_SERIAZBLE_ERROR = "Submitted job could not be properly serialized."
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
+// Stored jobs name their state class in "@class"; only these states are accepted.
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "@class")
+@JsonSubTypes(JsonSubTypes.Type(value = EmptyJobState::class, name = "com.geekbeast.rhizome.jobs.EmptyJobState"))
 interface JobState
 
 // reason: Hazelcast Predicates.in is a vararg API requiring spread; predicate sets are small
