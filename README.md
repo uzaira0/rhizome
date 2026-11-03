@@ -31,7 +31,7 @@ Distributed locks, caches, and other common data structures for building distrib
 
 ##### Embedded Jetty for HTTP
 
-Rhizome leverages Servlet 3.1 technologies and Spring for fully programatic web application configuration and development.  
+Rhizome uses Jakarta Servlet with Jetty EE11 and Spring for programmatic web application configuration. Dependency versions are pinned in the shared `gradles/chronicle.gradle`.
 
 ##### Spring MVC for REST + WebSockets
 
