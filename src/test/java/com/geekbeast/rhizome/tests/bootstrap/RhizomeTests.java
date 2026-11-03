@@ -75,14 +75,20 @@ public class RhizomeTests {
         // new ObjectMapper() can't serialize the Optional<ConnectorConfiguration> fields on
         // JettyConfiguration and throws InvalidDefinitionException.
         ObjectMapper mapper = ObjectMappers.getJsonMapper();
-        logger.info( "Context configuration: {}", mapper.writeValueAsString( api.getContextConfiguration() ) );
-        logger.info( "Jetty configuration: {}", mapper.writeValueAsString( api.getJettyConfiguration() ) );
+        // The endpoints serve the configuration the server actually loaded, field for field.
+        JettyConfiguration loaded = rhizome.getContext().getBean( JettyConfiguration.class );
+        Assert.assertEquals( mapper.readTree( mapper.writeValueAsString( loaded.getContextConfiguration().get() ) ),
+                mapper.readTree( mapper.writeValueAsString( api.getContextConfiguration() ) ) );
+        Assert.assertEquals( mapper.readTree( mapper.writeValueAsString( loaded ) ),
+                mapper.readTree( mapper.writeValueAsString( api.getJettyConfiguration() ) ) );
     }
 
     @Test
     public void testGetAdminEndpoint() {
         SimpleControllerAPI api = adapter.create( SimpleControllerAPI.class );
         TestConfiguration actual = api.getTestConfigurationSecuredAdmin();
+
+        Assert.assertEquals( expected, actual );
     }
 
     @Test(expected = RhizomeRetrofitCallException.class )
