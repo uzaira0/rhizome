@@ -18,7 +18,6 @@ import com.geekbeast.rhizome.pods.LoamPod;
 import com.geekbeast.rhizome.pods.MetricsPod;
 import com.geekbeast.rhizome.services.ServiceState;
 import com.geekbeast.rhizome.startup.Requirement;
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -42,6 +41,7 @@ import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRegistration;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.Lock;
@@ -272,7 +272,7 @@ public class Rhizome implements WebApplicationInitializer {
 
     public static void showBanner() {
         try {
-            logger.info( "\n\n{}\n\n", Resources.toString( Resources.getResource( "banner.txt" ), Charsets.UTF_8 ) );
+            logger.info( "\n\n{}\n\n", Resources.toString( Resources.getResource( "banner.txt" ), StandardCharsets.UTF_8 ) );
         } catch ( IOException e ) {
             logger.warn( "No startup banner found." );
         }
