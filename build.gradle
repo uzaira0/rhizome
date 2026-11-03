@@ -108,8 +108,33 @@ tasks.withType(Javadoc) {
     enabled = false
 }
 
-dokkaHtml {
-    outputDirectory = layout.buildDirectory.dir("javadoc")
+dokka {
+    dokkaPublications.named("html") {
+        outputDirectory.set(layout.buildDirectory.dir("javadoc"))
+        offlineMode.set(gradle.startParameter.offline)
+    }
+}
+
+tasks.named('javadocJar') {
+    doLast {
+        def archive = new java.util.zip.ZipFile(archiveFile.get().asFile)
+        try {
+            def publicSymbolPages = [
+                'com.geekbeast.rhizome.core/-rhizome/index.html',
+                'rhizome/com.geekbeast.rhizome.core/-rhizome/index.html',
+                'com/geekbeast/rhizome/core/Rhizome.html',
+                'rhizome/com/geekbeast/rhizome/core/Rhizome.html',
+            ]
+            if (!publicSymbolPages.any { name ->
+                def entry = archive.getEntry(name)
+                entry != null && !entry.directory && entry.size > 0
+            }) {
+                throw new GradleException('Rhizome javadocJar must contain the public Rhizome HTML page')
+            }
+        } finally {
+            archive.close()
+        }
+    }
 }
 
 test {
@@ -336,4 +361,3 @@ eclipse {
     ext.sourceCompatibility = JavaVersion.VERSION_21
     ext.targetCompatibility = JavaVersion.VERSION_21
 }
-
