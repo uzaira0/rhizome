@@ -1,3 +1,13 @@
+buildscript {
+    repositories { mavenCentral() }
+    dependencies {
+        def securityClasspathFloors = [
+            'com.fasterxml.jackson.core:jackson-databind:2.22.3',
+        ]
+        securityClasspathFloors.each { classpath it }
+    }
+}
+
 plugins {
     id 'maven-publish'
     id 'signing'
