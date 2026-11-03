@@ -56,7 +56,6 @@ open class StatementHolderSupplier @JvmOverloads constructor(
     val fetchSize: Int = 0,
     val autoCommit: Boolean = (fetchSize == 0),
     private val longRunningQueryLimit: Long = 0,
-    private val statementTimeoutMillis: Long = 0
 ) : Supplier<StatementHolder> {
     init {
         check(fetchSize >= 0) { "Fetch-size must be nonnegative." }
@@ -76,13 +75,6 @@ open class StatementHolderSupplier @JvmOverloads constructor(
         return connection.createStatement()
     }
 
-    open fun setStatementTimeout(statement: Statement): Statement {
-        if(statementTimeoutMillis > 0 ) {
-            statement.execute("SET statement_timeout = '${statementTimeoutMillis}ms';")
-        }
-        return statement
-    }
-
     // reason: boundary catch — any query-execution failure must roll back + close the connection (leak prevention) then rethrow
     @Suppress("TooGenericExceptionCaught")
     override fun get(): StatementHolder {
@@ -92,7 +84,6 @@ open class StatementHolderSupplier @JvmOverloads constructor(
         try {
             connection.autoCommit = autoCommit
             statement = buildStatement(connection)
-            setStatementTimeout(statement)
             statement.fetchSize = fetchSize
             resultSet = execute(statement)
             return if (longRunningQueryLimit == 0L) {
@@ -118,14 +109,12 @@ class PreparedStatementHolderSupplier(
     sql: String,
     fetchSize: Int = 0,
     autoCommit: Boolean = (fetchSize == 0),
-    statementTimeoutMillis: Long = 0,
     val bind: (PreparedStatement) -> Unit
 ) : StatementHolderSupplier(
     hds = hds,
     sql = sql,
     fetchSize = fetchSize,
     autoCommit = autoCommit,
-    statementTimeoutMillis = statementTimeoutMillis
 ) {
 
     override fun execute(statement: Statement): ResultSet {
@@ -152,7 +141,7 @@ class PostgresIterator<T> @Throws(SQLException::class)
     private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS
 ) : Iterator<T>, AutoCloseable, Closeable {
     companion object {
-        private const val DEFAULT_TIMEOUT_MILLIS: Long = 600000
+        const val DEFAULT_TIMEOUT_MILLIS: Long = 600000
         private val WATCHDOG_EXECUTOR: ScheduledExecutorService = Executors.newScheduledThreadPool(2) { r ->
             Thread(r, "postgres-iterator-watchdog").apply { isDaemon = true }
         }
