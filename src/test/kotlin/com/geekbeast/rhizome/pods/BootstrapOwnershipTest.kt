@@ -1,5 +1,7 @@
 package com.geekbeast.rhizome.pods
 
+import org.mockito.Mockito.`when`
+
 import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.health.HealthCheckRegistry
 import com.geekbeast.configuration.postgres.PostgresConfiguration
@@ -26,7 +28,6 @@ import org.junit.Test
 import org.mockito.Mockito.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
 import org.springframework.context.support.GenericApplicationContext
 import java.util.Optional
 import java.util.Properties
@@ -57,7 +58,7 @@ class BootstrapOwnershipTest {
         }
     }
 
-    @Test fun legacyDatasourceUsesManagerDefaultAndContextClosesAllPools() {
+    @Test fun defaultDatasourceUsesManagerDefaultAndContextClosesAllPools() {
         val properties = Properties().apply {
             setProperty("jdbcUrl", "jdbc:postgresql://127.0.0.1:1/not_used")
             setProperty("initializationFailTimeout", "-1")

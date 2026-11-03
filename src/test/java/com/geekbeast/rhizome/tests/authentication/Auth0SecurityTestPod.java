@@ -12,8 +12,7 @@ public class Auth0SecurityTestPod extends Auth0SecurityPod {
     @Override protected void authorizeRequests( HttpSecurity http ) throws Exception {
         // Spring Security 6's OAuth2 resource server maps the JWT `scope` claim to
         // authorities prefixed with SCOPE_ (e.g. "openid email" -> SCOPE_openid, SCOPE_email).
-        // The bare-name authorities ("openid"/"email") this was written against no longer
-        // exist, so match the prefixed names that the BearerTokenAuthenticationFilter grants.
+        // Match the prefixed names that the BearerTokenAuthenticationFilter grants.
         http.authorizeHttpRequests( auth -> auth
                 .requestMatchers( "/api/unsecured/**" ).authenticated()
                 .requestMatchers( "/api/secured/foo" ).hasAnyAuthority( "a", "b" )

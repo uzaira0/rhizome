@@ -56,8 +56,8 @@ class BasePostgresIterableTests {
         Assert.assertEquals(3, closeCount.get().toLong())
     }
 
-    // Regression V-27: an iterator consumed to the end (the for-loop / toList path, which never
-    // calls close()) left its periodic watchdog scheduled forever, pinning the iterator and holder.
+    // An iterator consumed to the end (the for-loop / toList path, which never calls close())
+    // must cancel its periodic watchdog, or the watchdog pins the iterator and holder forever.
     @Test
     @Throws(SQLException::class)
     fun testExhaustionCancelsWatchdog() {

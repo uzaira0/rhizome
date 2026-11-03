@@ -20,7 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 
 public class RetiredConfigurationKeysTest {
-    private static final String LEGACY_CONFIGURATIONS = """
+    private static final String RETIRED_CONFIGURATIONS = """
             rhizome.yaml:
               name: compatibility-test
               enable-persistence: false
@@ -99,8 +99,8 @@ public class RetiredConfigurationKeysTest {
     @Test
     public void retiredKeysAreAcceptedAndDiscarded() throws Exception {
         ObjectMapper yaml = ResourceConfigurationLoader.getYamlMapper();
-        JsonNode legacy = yaml.readTree( LEGACY_CONFIGURATIONS );
-        var files = legacy.fields();
+        JsonNode retired = yaml.readTree( RETIRED_CONFIGURATIONS );
+        var files = retired.fields();
         while ( files.hasNext() ) {
             var entry = files.next();
             yaml.writeValue( new File( configurations.getRoot(), entry.getKey() ), entry.getValue() );
@@ -112,7 +112,7 @@ public class RetiredConfigurationKeysTest {
                     configurations.getRoot().getPath(), type );
             assertNotNull( loaded );
             assertEquals( yaml.valueToTree( expected ), yaml.valueToTree( loaded ) );
-            JsonNode oldConfiguration = legacy.get( ResourceConfigurationLoader.getReloadableConfigurationUri( type ) );
+            JsonNode oldConfiguration = retired.get( ResourceConfigurationLoader.getReloadableConfigurationUri( type ) );
             for ( ObjectMapper mapper : mappers() ) {
                 Object actual = mapper.readValue( mapper.writeValueAsBytes( oldConfiguration ), type );
                 assertEquals( mapper.valueToTree( expected ), mapper.valueToTree( actual ) );
